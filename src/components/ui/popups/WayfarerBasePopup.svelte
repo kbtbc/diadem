@@ -122,7 +122,7 @@
 		{#if isExpanded()}
 			<div
 				class="px-6 overflow-y-auto mb-2"
-				style="max-height: calc(100vh - 26rem);"
+				style="max-height: calc(100dvh - 26rem);"
 				in:slide={{ duration: 90, easing: cubicIn }}
 				out:slide={{ duration: 90, easing: cubicOut }}
 			>

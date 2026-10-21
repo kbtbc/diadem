@@ -62,7 +62,7 @@
 	{#if fortDetails}
 		<Card
 			class="relative mx-auto items-center flex flex-col rounded-md! shadow-none! overflow-hidden w-xl max-w-full"
-			style="max-height: calc(100vh - 6rem)"
+			style="max-height: calc(100dvh - 6rem)"
 		>
 			<div class="absolute top-0 right-0 z-10 m-2 p-1">
 				<CloseButton

@@ -50,7 +50,7 @@
 	}}
 >
 	<Command.Root
-		class="rounded-lg bg-card text-card-foreground max-h-[calc(100vh-1rem)] overflow-hidden"
+		class="rounded-lg bg-card text-card-foreground max-h-[calc(100dvh-1rem)] overflow-hidden"
 		shouldFilter={false}
 	>
 		<div class="flex items-center border-b pb-px pr-px pl-2">
