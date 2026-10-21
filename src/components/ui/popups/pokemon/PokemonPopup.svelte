@@ -100,7 +100,14 @@
 	let mapExpandedRadius: boolean = $state(false);
 
 	function pokemonName(data: Partial<PokemonData>) {
-		return mPokemon(data);
+		return mPokemon(data) + genderSymbol(data.gender);
+	}
+
+	// Gender at a glance in the title: 1 male, 2 female, anything else (genderless) shows nothing.
+	function genderSymbol(gender: number | undefined) {
+		if (gender === 1) return " ♂";
+		if (gender === 2) return " ♀";
+		return "";
 	}
 
 	function speciesName(data: PokemonData) {
@@ -356,8 +363,8 @@
 					alt={mPokemon(displayPokemon)}
 				/>
 				{m.notice_disguise({
-					name1: pokemonName(data),
-					name2: pokemonName(displayPokemon)
+					name1: mPokemon(data),
+					name2: mPokemon(displayPokemon)
 				})}
 			</BasicMainCard>
 		{/if}
