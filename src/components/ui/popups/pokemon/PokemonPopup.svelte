@@ -100,7 +100,9 @@
 	let mapExpandedRadius: boolean = $state(false);
 
 	function pokemonName(data: Partial<PokemonData>) {
-		return mPokemon(data) + genderSymbol(data.gender);
+		// Gender goes right after the name; the shiny sparkle (which mPokemon would
+		// otherwise put first) follows it: "Hatenna ♀ ✨".
+		return mPokemon({ ...data, shiny: false }) + genderSymbol(data.gender) + (data.shiny ? " ✨" : "");
 	}
 
 	// Gender at a glance in the title: 1 male, 2 female, anything else (genderless) shows nothing.
