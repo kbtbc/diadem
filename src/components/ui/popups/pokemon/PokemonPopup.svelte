@@ -15,7 +15,12 @@
 	import IvBreakdown from "@/components/ui/popups/pokemon/IvBreakdown.svelte";
 	import UpdatedTimes from "@/components/ui/popups/common/UpdatedTimes.svelte";
 	import MainAccessMap from "@/components/ui/popups/common/MainAccessMap.svelte";
-	import { getIconItem, getIconPokemon } from "$lib/services/uicons.svelte";
+	import {
+		DEFAULT_UICONS,
+		getIconItem,
+		getIconPokemon,
+		getIconTappable
+	} from "$lib/services/uicons.svelte";
 	import {
 		getPokemonStats as getMasterPokemonStats,
 		type PokemonStats
@@ -263,8 +268,11 @@
 			<BasicMainCard class="flex gap-4 font-medium items-center justify-center">
 				<img
 					class="w-8 shrink-0"
-					src={resize(getIconItem(1151), { width: 64 })}
-					alt={mItem(1151)}
+					src={resize(
+						getIconTappable({ tappable_type: "TAPPABLE_TYPE_BOX" }, { iconSet: DEFAULT_UICONS }),
+						{ width: 64 }
+					)}
+					alt=""
 				/>
 				{m.notice_tappable({ name: speciesName(data) })}
 			</BasicMainCard>
