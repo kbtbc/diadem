@@ -29,13 +29,33 @@ export class TappableQuery extends DbMapObjectQuery<TappableData, FilterTappable
 		const filtersets = filter.filters.filter((f) => f.enabled);
 		if (filtersets.length === 0) return { sql: "", values: [] };
 
-		// A filterset without a species list matches every tappable.
-		if (filtersets.some((f) => !f.pokemon?.length)) return { sql: "", values: [] };
+		const clauses: string[] = [];
+		const values: unknown[] = [];
+		const placeholders = (ids: number[]) => ids.map(() => "?").join(",");
 
-		const ids = new Set<number>();
 		for (const filterset of filtersets) {
-			for (const pokemon of filterset.pokemon ?? []) ids.add(pokemon.pokemon_id);
+			const pokemon = [...new Set((filterset.pokemon ?? []).map((p) => p.pokemon_id))];
+			const items = [...new Set((filterset.item ?? []).map((i) => Number(i.id)))];
+			const candy = [...new Set((filterset.candy ?? []).map((c) => Number(c.id)))];
+
+			// A filterset without any reward attribute matches every tappable.
+			if (!pokemon.length && !items.length && !candy.length) return { sql: "", values: [] };
+
+			// A tappable gives one kind of reward, so the attributes are alternatives.
+			if (pokemon.length) {
+				clauses.push(`pokemon_id IN (${placeholders(pokemon)})`);
+				values.push(...pokemon);
+			}
+			if (items.length) {
+				clauses.push(`item_id IN (${placeholders(items)})`);
+				values.push(...items);
+			}
+			if (candy.length) {
+				clauses.push(`(reward_type = 'pokemon_candy' AND reward_pokemon_id IN (${placeholders(candy)}))`);
+				values.push(...candy);
+			}
 		}
-		return { sql: `pokemon_id IN (${[...ids].map(() => "?").join(",")})`, values: [...ids] };
+
+		return { sql: `(${clauses.join(" OR ")})`, values };
 	}
 }

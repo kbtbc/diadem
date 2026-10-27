@@ -203,6 +203,10 @@ export function getActiveNests(): NestStatsEntry[] {
 	return masterStats?.activeNests ?? [];
 }
 
+export function getActiveTappables() {
+	return masterStats?.activeTappables ?? { pokemon: [], item: [], candy: [] };
+}
+
 export function getActiveEggs(): EggStats[] {
 	return masterStats?.activeEggs ?? [];
 }

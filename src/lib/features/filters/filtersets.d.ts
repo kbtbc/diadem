@@ -158,4 +158,6 @@ export type FiltersetSpawnpoint = BaseFilterset & {};
 
 export type FiltersetTappable = BaseFilterset & {
 	pokemon?: Pokemon[];
+	item?: QuestReward[];
+	candy?: QuestReward[];
 };

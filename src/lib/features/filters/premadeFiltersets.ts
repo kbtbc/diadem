@@ -7,6 +7,7 @@ import type {
 } from "@/lib/features/filters/filtersets";
 import { getPremadeInvasionFiltersets } from "@/lib/features/filters/filterUtilsInvasion";
 import { getPremadeQuestFiltersets } from "@/lib/features/filters/filterUtilsQuest";
+import { getPremadeTappableFiltersets } from "@/lib/features/filters/filterUtilsTappable";
 import { IconCategory, IconFeature } from "@/lib/features/filters/icons";
 import { MODIFIER_COLORS } from "@/lib/features/filters/modifierPresets";
 import { RaidLevel } from "@/lib/utils/gymUtils";
@@ -209,6 +210,8 @@ export function getPremadeFiltersets(category: FilterCategory) {
 		const questFilters = getPremadeQuestFiltersets();
 		if (!questFilters) return;
 		filters.push(...questFilters);
+	} else if (category === "tappable") {
+		filters.push(...getPremadeTappableFiltersets());
 	} else if (category === "invasion") {
 		const invasionFilters = getPremadeInvasionFiltersets();
 		if (!invasionFilters) return;

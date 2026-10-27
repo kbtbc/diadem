@@ -419,7 +419,7 @@
 	"new_tappable_filter": "New Ground Item Filter",
 	"edit_tappable_filter": "Edit Ground Item Filter",
 	"filter_template_tappable_fallback": "Ground Item Filter",
-	"filter_template_pokemon_tappables": "{pokemon} Ground Items",
+	"filter_template_tappable_reward": "{reward} Ground Items",
 	"max_battle_only_show_active": "Only show active",
 	"max_battle_only_show": "Only show",
 	"max_battle_active": "Active",

@@ -34,20 +34,44 @@ describe("TappableQuery.getFilterWhere", () => {
 		});
 	});
 
-	it("restricts to the selected species across enabled filtersets", () => {
+	it("restricts to the selected species and ignores disabled filtersets", () => {
 		const result = where(
 			filter([
-				filterset({ pokemon: [{ pokemon_id: 25, form: 0 }, { pokemon_id: 1, form: 0 }] }),
-				filterset({ pokemon: [{ pokemon_id: 25, form: 0 }] }),
+				filterset({
+					pokemon: [
+						{ pokemon_id: 94, form: 0 },
+						{ pokemon_id: 1, form: 0 }
+					]
+				}),
+				filterset({ pokemon: [{ pokemon_id: 94, form: 0 }] }),
 				filterset({ enabled: false, pokemon: [{ pokemon_id: 999, form: 0 }] })
 			])
 		);
-		expect(result).toEqual({ sql: "pokemon_id IN (?,?)", values: [25, 1] });
+		expect(result).toEqual({
+			sql: "(pokemon_id IN (?,?) OR pokemon_id IN (?))",
+			values: [94, 1, 94]
+		});
 	});
 
-	it("does not restrict when any enabled filterset has no species", () => {
+	it("treats species, items and candy of one filterset as alternatives", () => {
+		const result = where(
+			filter([
+				filterset({
+					pokemon: [{ pokemon_id: 94, form: 0 }],
+					item: [{ id: "1" }, { id: "2" }],
+					candy: [{ id: "94" }]
+				})
+			])
+		);
+		expect(result).toEqual({
+			sql: "(pokemon_id IN (?) OR item_id IN (?,?) OR (reward_type = 'pokemon_candy' AND reward_pokemon_id IN (?)))",
+			values: [94, 1, 2, 94]
+		});
+	});
+
+	it("does not restrict when any enabled filterset has no reward attribute", () => {
 		expect(
-			where(filter([filterset({ pokemon: [{ pokemon_id: 25, form: 0 }] }), filterset()]))
+			where(filter([filterset({ pokemon: [{ pokemon_id: 94, form: 0 }] }), filterset()]))
 		).toEqual({ sql: "", values: [] });
 	});
 });

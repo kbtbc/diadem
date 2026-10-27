@@ -141,6 +141,17 @@ export type NestStatsEntry = {
 	count: number;
 };
 
+export type TappableStatsEntry = {
+	id: number;
+	count: number;
+};
+
+export type ActiveTappables = {
+	pokemon: TappableStatsEntry[];
+	item: TappableStatsEntry[];
+	candy: TappableStatsEntry[];
+};
+
 export type EggStats = {
 	pokemon_id: number;
 	form: number;
@@ -171,6 +182,7 @@ export type MasterStats = {
 	activeContests: ContestStatsEntry[];
 	activeMaxBattles: MaxBattleStatsEntry[];
 	activeNests: NestStatsEntry[];
+	activeTappables: ActiveTappables;
 	activeEggs: EggStats[];
 	generatedAt: number;
 };
@@ -269,6 +281,25 @@ function getInvasionCharacterId(name: string, type: string): number | null {
 	return null;
 }
 
+async function queryActiveTappables(): Promise<ActiveTappables> {
+	// Tappable stats are optional: a failure (for example a missing candy column) must not break the other stats.
+	const rows = async (sql: string): Promise<TappableStatsEntry[]> => {
+		try {
+			const result = await query<{ id: number; count: number }[]>(sql);
+			return result.map((row) => ({ id: Number(row.id), count: Number(row.count) }));
+		} catch {
+			return [];
+		}
+	};
+	const active = "expire_timestamp > UNIX_TIMESTAMP()";
+	const [pokemon, item, candy] = await Promise.all([
+		rows(`SELECT pokemon_id AS id, COUNT(*) AS count FROM tappable WHERE pokemon_id IS NOT NULL AND ${active} GROUP BY 1`),
+		rows(`SELECT item_id AS id, COUNT(*) AS count FROM tappable WHERE item_id IS NOT NULL AND ${active} GROUP BY 1`),
+		rows(`SELECT reward_pokemon_id AS id, COUNT(*) AS count FROM tappable WHERE reward_type = 'pokemon_candy' AND reward_pokemon_id IS NOT NULL AND ${active} GROUP BY 1`)
+	]);
+	return { pokemon, item, candy };
+}
+
 export async function queryMasterStats(): Promise<MasterStats> {
 	// TODO: timeframe
 
@@ -281,6 +312,7 @@ export async function queryMasterStats(): Promise<MasterStats> {
 		allContestStats,
 		allMaxBattlesStats,
 		allNestsStats,
+		activeTappables,
 		eggsData,
 		invasionLineupsData
 	] = await Promise.all([
@@ -348,6 +380,7 @@ export async function queryMasterStats(): Promise<MasterStats> {
 				"AND updated > UNIX_TIMESTAMP() - 86400 " +
 				"GROUP BY 1, 2"
 		),
+		queryActiveTappables(),
 		fetchJson(`${scrapedDuckUrl}eggs.min.json`),
 		fetchJson(`${scrapedDuckUrl}rocketLineups.min.json`)
 	]);
@@ -613,6 +646,7 @@ export async function queryMasterStats(): Promise<MasterStats> {
 		activeContests,
 		activeMaxBattles,
 		activeNests,
+		activeTappables,
 		activeEggs: activeEggs,
 		generatedAt: Date.now()
 	};
