@@ -4,12 +4,14 @@ import type {
 	BaseFilterset,
 	FiltersetInvasion,
 	FiltersetMaxBattle,
+	FiltersetTappable,
 	FiltersetPokemon,
 	FiltersetQuest,
 	FiltersetRaid
 } from "@/lib/features/filters/filtersets";
 import { generateInvasionFilterDetails } from "@/lib/features/filters/filterUtilsInvasion";
 import { generateMaxBattleFilterDetails } from "@/lib/features/filters/filterUtilsMaxBattle";
+import { generateTappableFilterDetails } from "@/lib/features/filters/filterUtilsTappable";
 import { generatePokemonFilterDetails } from "@/lib/features/filters/filterUtilsPokemon";
 import { generateQuestFilterDetails } from "@/lib/features/filters/filterUtilsQuest";
 import { generateRaidFilterDetails } from "@/lib/features/filters/filterUtilsRaid";
@@ -82,6 +84,8 @@ export function generateFilterDetails(
 		generateInvasionFilterDetails(filtersert as FiltersetInvasion);
 	} else if (subCategory === "maxBattle") {
 		generateMaxBattleFilterDetails(filtersert as FiltersetMaxBattle);
+	} else if (majorCategory === "tappable") {
+		generateTappableFilterDetails(filtersert as FiltersetTappable);
 	}
 }
 

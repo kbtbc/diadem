@@ -156,4 +156,6 @@ export type FiltersetNest = BaseFilterset & {
 
 export type FiltersetSpawnpoint = BaseFilterset & {};
 
-export type FiltersetTappable = BaseFilterset & {};
+export type FiltersetTappable = BaseFilterset & {
+	pokemon?: Pokemon[];
+};

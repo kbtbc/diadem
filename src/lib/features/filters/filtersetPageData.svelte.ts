@@ -196,6 +196,8 @@ export function openFiltersetModal() {
 		openModal("filtersetInvasion");
 	} else if (majorCategory === "station" && subCategory === "maxBattle") {
 		openModal("filtersetMaxBattle");
+	} else if (majorCategory === "tappable") {
+		openModal("filtersetTappable");
 	}
 }
 

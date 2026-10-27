@@ -22,6 +22,7 @@ export type OpenModals = {
 	filtersetInvasion: boolean;
 	filtersetRaid: boolean;
 	filtersetMaxBattle: boolean;
+	filtersetTappable: boolean;
 	stylePicker: boolean;
 };
 export type ModalType = keyof OpenModals;
@@ -36,6 +37,7 @@ let openModals: OpenModals = $state({
 	filtersetInvasion: false,
 	filtersetRaid: false,
 	filtersetMaxBattle: false,
+	filtersetTappable: false,
 	stylePicker: false
 });
 

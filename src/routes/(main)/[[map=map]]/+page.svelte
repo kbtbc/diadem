@@ -23,6 +23,7 @@
 	import PokemonFilterset from "@/components/menus/filters/filterset/pokemon/PokemonFilterset.svelte";
 	import InvasionFilterset from "@/components/menus/filters/filterset/invasion/InvasionFilterset.svelte";
 	import MaxBattleFilterset from "@/components/menus/filters/filterset/maxBattle/MaxBattleFilterset.svelte";
+	import TappableFilterset from "@/components/menus/filters/filterset/tappable/TappableFilterset.svelte";
 	import { isSearchViewActive } from "@/lib/features/activeSearch.svelte.js";
 	import ActiveSearchView from "@/components/ui/search/ActiveSearchView.svelte";
 	import { isOnMap } from "@/lib/utils/getMapPath";
@@ -66,6 +67,7 @@
 	<RaidFilterset />
 	<InvasionFilterset />
 	<MaxBattleFilterset />
+	<TappableFilterset />
 
 	{#if isSearchViewActive()}
 		<div class="fixed z-50 top-safe-inset-top px-2 w-full pointer-events-none">

@@ -144,7 +144,7 @@
 		title={mapObjectLabels[MapObjectType.TAPPABLE]()}
 		mapObject={MapObjectType.TAPPABLE}
 		category="tappable"
-		isFilterable={false}
+		filterModal="filtersetTappable"
 	/>
 
 	<FilterSection
