@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Binoculars, Earth, MapPin } from "@lucide/svelte";
+	import { Binoculars, Earth, LocateFixed, MapPin } from "@lucide/svelte";
 	import { FillLayer, GeoJSON, LineLayer, MapLibre } from "svelte-maplibre";
 	import ToolLink from "@/components/menus/tools/ToolLink.svelte";
 	import { getCoverageMapAreas, openCoverageMap } from "@/lib/features/coverageMap.svelte";
@@ -36,6 +36,18 @@
 				setCurrentScoutCoords([Coords.infer(map.getCenter())]);
 				setCurrentScoutCenter(Coords.infer(map.getCenter()));
 				openMenu(Menu.SCOUT);
+			}}
+		></ToolLink>
+	{/if}
+
+	{#if hasFeatureAnywhere(getUserDetails().permissions, Features.FOLLOW_ME) && getConfig().tools.followMe}
+		<ToolLink
+			Icon={LocateFixed}
+			title={m.tool_follow_me_title()}
+			description={m.tool_follow_me_description()}
+			onclick={() => {
+				setJustChangedMenus();
+				openMenu(Menu.FOLLOW_ME);
 			}}
 		></ToolLink>
 	{/if}

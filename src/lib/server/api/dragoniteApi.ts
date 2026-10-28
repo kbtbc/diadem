@@ -43,6 +43,46 @@ export async function addScoutEntries(username: string, locations: number[][]) {
 	return response.ok;
 }
 
+export type DragoniteArea = {
+	name: string;
+	enabled: boolean;
+	expectedWorkers: number;
+};
+
+/**
+ * Areas Dragonite is running, with their worker totals.
+ *
+ * /status reports no mode per worker manager, so "does this area have pokemon
+ * coverage" cannot be answered from here alone - followMeAreas.ts subtracts the
+ * fort/quest-only areas named in config.
+ */
+export async function getDragoniteAreas(): Promise<DragoniteArea[] | undefined> {
+	const url = new URL("status", getServerConfig().dragonite.url);
+	const response = await fetch(url, { headers: getHeaders() });
+
+	if (!response.ok) {
+		log.error("Error while getting dragonite status [%d]", response.status);
+		return undefined;
+	}
+
+	const data = (await response.json()) as {
+		areas?: {
+			name: string;
+			enabled: boolean;
+			worker_managers?: { expected_workers?: number }[];
+		}[];
+	};
+
+	return (data.areas ?? []).map((area) => ({
+		name: area.name,
+		enabled: Boolean(area.enabled),
+		expectedWorkers: (area.worker_managers ?? []).reduce(
+			(total, manager) => total + (manager.expected_workers ?? 0),
+			0
+		)
+	}));
+}
+
 export async function getScoutQueue(): Promise<number | undefined> {
 	const url = new URL("scout/queue", getServerConfig().dragonite.url);
 	const response = await fetch(url, { headers: getHeaders() });

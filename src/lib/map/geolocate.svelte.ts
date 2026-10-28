@@ -10,6 +10,10 @@ type Location = {
 	lat: number;
 	lng: number;
 	heading: number | undefined;
+	/** Ground speed in metres per second, or undefined before a second fix. */
+	speed: number | undefined;
+	/** Fix time in epoch milliseconds. */
+	timestamp: number;
 };
 
 let geolocationEnabled: boolean = $state(false);
@@ -20,6 +24,7 @@ let watchId: number | undefined = undefined;
 let animationFrame: number | undefined = undefined;
 let shouldUpdateLocation = false;
 let shouldUpdateCamera = false;
+let previousFix: { lat: number; lng: number; timestamp: number } | undefined = undefined;
 
 const minZoom = 14.5;
 const maxZoom = 17.5;
@@ -63,6 +68,7 @@ export function resetLocate() {
 
 	isFetchingLocation = false;
 	currentLocation = undefined;
+	previousFix = undefined;
 	watchId = undefined;
 }
 
@@ -89,7 +95,9 @@ function animateLocation(location: Location, map: maplibre.Map | undefined) {
 		currentLocation = {
 			lng: startLocation.lng + (location.lng - startLocation.lng) * easedProgress,
 			lat: startLocation.lat + (location.lat - startLocation.lat) * easedProgress,
-			heading: location.heading
+			heading: location.heading,
+			speed: location.speed,
+			timestamp: location.timestamp
 		};
 
 		if (progress < 1) {
@@ -147,6 +155,7 @@ function handleGeolocationError(e: GeolocationPositionError) {
 
 	geolocationEnabled = false;
 	currentLocation = undefined;
+	previousFix = undefined;
 }
 
 export async function updateGeolocationEnabled(showResult: boolean = false) {
@@ -173,6 +182,32 @@ export async function updateGeolocationEnabled(showResult: boolean = false) {
 		openToast(errorReason);
 	}
 	return geolocationOk;
+}
+
+/**
+ * Ground speed in metres per second. Devices that report coords.speed are
+ * trusted; the rest get it from the displacement since the previous fix, which
+ * is all the follow-me speed gate needs. Smoothing and the threshold itself
+ * live in followMe.svelte.ts - this only reports what the fix says.
+ */
+function readSpeed(
+	position: GeolocationPosition,
+	coords: { lat: number; lng: number }
+): number | undefined {
+	const reported = position.coords.speed;
+	const previous = previousFix;
+	previousFix = { ...coords, timestamp: position.timestamp };
+
+	if (reported !== null && Number.isFinite(reported) && reported >= 0) return reported;
+	if (!previous) return undefined;
+
+	const elapsedSeconds = (position.timestamp - previous.timestamp) / 1000;
+	if (elapsedSeconds <= 0) return undefined;
+
+	const moved = distance([previous.lng, previous.lat], [coords.lng, coords.lat], {
+		units: "meters"
+	});
+	return moved / elapsedSeconds;
 }
 
 function handleGeolocationPosition(s: GeolocationPosition, map: maplibre.Map | undefined) {
@@ -211,7 +246,9 @@ function handleGeolocationPosition(s: GeolocationPosition, map: maplibre.Map | u
 
 	const location: Location = {
 		...locationCoords,
-		heading
+		heading,
+		speed: readSpeed(s, locationCoords),
+		timestamp: s.timestamp
 	};
 
 	isFetchingLocation = false;
@@ -230,6 +267,21 @@ function handleGeolocationPosition(s: GeolocationPosition, map: maplibre.Map | u
 	} else if (currentLocation && currentLocation.heading !== heading) {
 		currentLocation.heading = heading;
 	}
+}
+
+/**
+ * Make sure a position watch is running, without touching camera follow.
+ *
+ * updateLocation() is the locate button: called again while watching it toggles
+ * the watch off. Follow-me needs a live fix stream and must neither cancel the
+ * user's watch nor start the camera chasing them, so it comes in here instead.
+ */
+export function ensureLocationWatch(map: maplibre.Map | undefined) {
+	if (watchId !== undefined || isFetchingLocation) return;
+
+	const wasFollowing = isLocateFollowing;
+	beginLocate(map, true);
+	isLocateFollowing = wasFollowing;
 }
 
 export function updateLocation(map: maplibre.Map | undefined, allowFollow: boolean) {
