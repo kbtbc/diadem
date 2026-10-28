@@ -16,7 +16,12 @@
 		setCurrentScoutCoords
 	} from "@/lib/features/scout.svelte";
 	import { Menu, openMenu, setJustChangedMenus } from "@/lib/ui/menus.svelte";
-	import { getFollowMeSummary, toggleFollowMe } from "@/lib/features/followMe/followMe.svelte";
+	import {
+		getFollowMeNotice,
+		getFollowMeSummary,
+		toggleFollowMe
+	} from "@/lib/features/followMe/followMe.svelte";
+	import Card from "@/components/ui/Card.svelte";
 	import { getMap } from "@/lib/map/map.svelte";
 	import { Coords } from "@/lib/utils/coordinates";
 	import { getDefaultMapStyle } from "@/lib/services/themeMode";
@@ -42,12 +47,22 @@
 	{/if}
 
 	{#if hasFeatureAnywhere(getUserDetails().permissions, Features.FOLLOW_ME) && getConfig().tools.followMe}
-		<ToolLink
-			Icon={LocateFixed}
-			title={m.tool_follow_me_title()}
-			description={getFollowMeSummary()}
-			onclick={toggleFollowMe}
-		></ToolLink>
+		{#if getFollowMeNotice() === "covered"}
+			<Card class="border-destructive/40 bg-destructive/10 px-4 py-3">
+				<p class="font-semibold text-destructive">{m.followme_covered_title()}</p>
+				<p class="text-destructive/80 mt-1 text-sm">
+					{m.followme_covered_lead()}
+					<a class="underline underline-offset-2" href="/coverage">{m.followme_covered_link()}</a>.
+				</p>
+			</Card>
+		{:else}
+			<ToolLink
+				Icon={LocateFixed}
+				title={m.tool_follow_me_title()}
+				description={getFollowMeSummary()}
+				onclick={toggleFollowMe}
+			></ToolLink>
+		{/if}
 	{/if}
 
 	{#if isSupportedFeature("koji") && getConfig().tools.coverageMap && hasFeatureAnywhere(getUserDetails().permissions, Features.COVERAGE_MAP)}
