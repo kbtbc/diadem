@@ -13,13 +13,20 @@ import type { LatLon } from "@/lib/utils/coordinates";
  * switched to the game and thrown a ball, so the scan would be wasted.
  *
  * Started at 10 km/h, which is a jog: cyclists and traffic tripped it
- * constantly. 45 means you are in a vehicle on a road, where the scan really
- * is wasted, and leaves walking and crawling traffic alone.
+ * constantly. Then 45, which turned out to be ordinary town driving - a
+ * tester spent a whole drive home latched. 60 is a road speed you genuinely
+ * cannot act on a scan at, and leaves town traffic alone.
  */
-export const FOLLOW_ME_MAX_SPEED_KMH = 45;
+export const FOLLOW_ME_MAX_SPEED_KMH = 60;
 
-/** Resume below this, so a red light or a platform does not end the session. */
-export const FOLLOW_ME_RESUME_SPEED_KMH = 35;
+/**
+ * Resume below this, so a red light or a platform does not end the session.
+ *
+ * 35 was 22 mph, which sits inside the band a car spends most of its time in
+ * around town, so the gate stayed latched for a whole trip. 40 reopens at
+ * town speed.
+ */
+export const FOLLOW_ME_RESUME_SPEED_KMH = 40;
 
 export type SpeedLimits = {
 	maxKmh: number;
@@ -30,6 +37,15 @@ export const DEFAULT_SPEED_LIMITS: SpeedLimits = {
 	maxKmh: FOLLOW_ME_MAX_SPEED_KMH,
 	resumeKmh: FOLLOW_ME_RESUME_SPEED_KMH
 };
+
+/**
+ * Where resume sits relative to the trip threshold when only the latter is
+ * configured. Derived from the shipped pair rather than written out, so moving
+ * one constant cannot leave the fallback behind - this was a literal 0.78,
+ * which stopped meaning FOLLOW_ME_RESUME_SPEED_KMH the moment the trip
+ * threshold moved.
+ */
+const RESUME_RATIO = FOLLOW_ME_RESUME_SPEED_KMH / FOLLOW_ME_MAX_SPEED_KMH;
 
 /**
  * Config can only widen the gap, never invert it: a resume threshold at or
@@ -46,7 +62,7 @@ export function resolveSpeedLimits(
 	const wanted =
 		Number.isFinite(resumeKmh) && (resumeKmh as number) >= 0
 			? (resumeKmh as number)
-			: Math.round(max * 0.78);
+			: Math.round(max * RESUME_RATIO);
 	return { maxKmh: max, resumeKmh: Math.min(wanted, max) };
 }
 
@@ -141,6 +157,8 @@ export function shouldScan(state: ScanState): boolean {
  * The speed gate, latched so it has hysteresis: it trips above
  * FOLLOW_ME_MAX_SPEED_KMH and only clears below FOLLOW_ME_RESUME_SPEED_KMH.
  *
+ * Which reading to hand it is gateSpeedKmh's decision, not this one's.
+ *
  * An unknown speed releases the latch rather than holding it. Keeping someone
  * paused on evidence that has expired is how a tester ended up stuck: he
  * stopped the car and sat, no usable fixes arrived, so the estimate never came
@@ -170,8 +188,20 @@ export const MIN_SPEED_SAMPLES = 3;
  *
  * Without an expiry the last few fixes before the phone stopped reporting -
  * backgrounded, indoors, accuracy gone - stayed the whole estimate forever.
+ * A minute was still far too long, because a phone that stops issuing fixes
+ * the moment it is set down leaves the gate waiting out the whole minute
+ * before it will reopen - the "sat at a stop and it never came off paused"
+ * report.
  */
-export const SPEED_SAMPLE_TTL_MS = 60_000;
+export const SPEED_SAMPLE_TTL_MS = 20_000;
+
+/**
+ * A sample this fresh may reopen the gate on its own, without a median behind
+ * it. Releasing on thin evidence is the safe direction: the cost is one scan
+ * taken slightly too fast, which the quota caps anyway, where the cost of
+ * holding the latch shut is the feature not working at all.
+ */
+export const RELEASE_SAMPLE_MAX_AGE_MS = 15_000;
 
 export type SpeedSample = {
 	metersPerSecond: number;
@@ -179,11 +209,44 @@ export type SpeedSample = {
 	at: number;
 };
 
+function toKmh(metersPerSecond: number): number {
+	return (metersPerSecond * 3600) / 1000;
+}
+
 /** Median rejects a spike better than a mean, which one bad fix can carry. */
 export function medianSpeedKmh(samples: SpeedSample[], now: number): number | undefined {
 	const fresh = samples.filter((sample) => now - sample.at <= SPEED_SAMPLE_TTL_MS);
 	if (fresh.length < MIN_SPEED_SAMPLES) return undefined;
 
 	const sorted = fresh.map((sample) => sample.metersPerSecond).sort((a, b) => a - b);
-	return (sorted[Math.floor(sorted.length / 2)] * 3600) / 1000;
+	return toKmh(sorted[Math.floor(sorted.length / 2)]);
+}
+
+/** The newest sample, if it is recent enough to stand on its own. */
+export function latestSpeedKmh(samples: SpeedSample[], now: number): number | undefined {
+	let newest: SpeedSample | undefined = undefined;
+	for (const sample of samples) {
+		if (now - sample.at > RELEASE_SAMPLE_MAX_AGE_MS) continue;
+		if (!newest || sample.at > newest.at) newest = sample;
+	}
+	return newest ? toKmh(newest.metersPerSecond) : undefined;
+}
+
+/**
+ * Which reading the gate should judge, which is not the same reading in both
+ * directions.
+ *
+ * Tripping goes on the median, so one wild fix cannot pause the feature.
+ * Releasing goes on the newest fresh sample, because the median is a window of
+ * history and waiting for it to turn over is what kept a tester latched
+ * through stop-and-go traffic and for a minute after he had parked. One good
+ * fix below the line is enough to let go.
+ */
+export function gateSpeedKmh(
+	samples: SpeedSample[],
+	now: number,
+	paused: boolean
+): number | undefined {
+	if (!paused) return medianSpeedKmh(samples, now);
+	return latestSpeedKmh(samples, now) ?? medianSpeedKmh(samples, now);
 }
