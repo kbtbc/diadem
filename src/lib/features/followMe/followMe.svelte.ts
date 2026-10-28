@@ -7,13 +7,14 @@ import { getMap } from "@/lib/map/map.svelte";
 import { getConfig } from "@/lib/services/config/config";
 import * as m from "@/lib/paraglide/messages";
 import { openToast } from "@/lib/ui/toasts.svelte.js";
-import { Coords } from "@/lib/utils/coordinates";
+import { Coords, type LatLon } from "@/lib/utils/coordinates";
 import { encodeRequestBody, getHeaders, parseResponse } from "@/lib/utils/requests";
 import {
 	FOLLOW_ME_MAX_INTERVAL_MS,
 	medianSpeedKmh,
 	resolveMinInterval,
 	resolveSpeedLimits,
+	shouldResumeSession,
 	shouldScan as decideScan,
 	speedGateBlocks as decideSpeedGate,
 	type SpeedSample
@@ -42,6 +43,13 @@ export const FOLLOW_ME_SESSION_TIMEOUT_MS = 3 * 60 * 60_000;
 export const FOLLOW_ME_HIDDEN_TIMEOUT_MS = 30 * 60_000;
 
 /** Poll rate while the user is on the move. */
+/**
+ * Android Chrome discards backgrounded tabs, so switching to the game and back
+ * can silently reload the page. Without this the session died on every reload
+ * and the only sign was the chip vanishing.
+ */
+const STORAGE_KEY = "followMe:session";
+
 const TICK_MOVING_MS = 5_000;
 
 /** How long to wait after a transient refusal before asking again. */
@@ -79,6 +87,7 @@ let timer: ReturnType<typeof setTimeout> | undefined = undefined;
 let nextWakeAt = 0;
 let backoffUntil = 0;
 let unsubscribeLocation: (() => void) | undefined = undefined;
+let restoreAttempted = false;
 
 export function getFollowMeActive() {
 	return active;
@@ -234,6 +243,13 @@ async function requestScan(center: Coords): Promise<void> {
 		body: encoded.body,
 		headers: getHeaders(encoded.contentType)
 	});
+	if (response.status === 401) {
+		// Signed out, or the entitlement went away: retrying every minute would
+		// achieve nothing.
+		stopFollowMe();
+		return;
+	}
+
 	const data = await parseResponse<{ result?: FollowMeResult; error?: string }>(response);
 
 	if (data.error || !data.result) {
@@ -247,6 +263,7 @@ async function requestScan(center: Coords): Promise<void> {
 		lastScanAt = Date.now();
 		scanCount += 1;
 		status = "idle";
+		persistSession();
 
 		openToast(m.followme_toast_scanned({ count: data.result.locations ?? 0 }));
 		return;
@@ -371,6 +388,72 @@ function onVisibilityChange() {
 	}
 }
 
+function persistSession() {
+	if (!active) return;
+	try {
+		localStorage.setItem(
+			STORAGE_KEY,
+			JSON.stringify({
+				startedAt,
+				lastScanAt,
+				lastScanCenter: lastScanCenter?.internal(),
+				scanCount
+			})
+		);
+	} catch {
+		// private mode or a full quota: the session just will not survive a reload
+	}
+}
+
+function clearPersistedSession() {
+	try {
+		localStorage.removeItem(STORAGE_KEY);
+	} catch {
+		// nothing to do
+	}
+}
+
+/**
+ * Pick a session back up after a page load, if its own timeouts say it should
+ * still be running. Called once from the map chip, which is always mounted.
+ */
+export function restoreFollowMe() {
+	if (restoreAttempted || active) return;
+	restoreAttempted = true;
+
+	let saved:
+		| { startedAt: number; lastScanAt: number; lastScanCenter?: LatLon; scanCount: number }
+		| undefined;
+	try {
+		const raw = localStorage.getItem(STORAGE_KEY);
+		saved = raw ? JSON.parse(raw) : undefined;
+	} catch {
+		return;
+	}
+	if (!saved) return;
+
+	const resumable = shouldResumeSession(saved, Date.now(), {
+		sessionMs: FOLLOW_ME_SESSION_TIMEOUT_MS,
+		idleMs: FOLLOW_ME_IDLE_TIMEOUT_MS
+	});
+	if (!resumable) {
+		clearPersistedSession();
+		return;
+	}
+
+	startFollowMe();
+
+	// Carry the original session's clock and history over, so a reload does not
+	// hand the user a fresh hour or reset the count they were watching.
+	startedAt = saved.startedAt;
+	lastScanAt = saved.lastScanAt;
+	lastScanCenter = saved.lastScanCenter
+		? new Coords(saved.lastScanCenter.lat, saved.lastScanCenter.lon)
+		: undefined;
+	scanCount = saved.scanCount ?? 0;
+	persistSession();
+}
+
 export function startFollowMe() {
 	if (active) return;
 
@@ -389,6 +472,7 @@ export function startFollowMe() {
 	ensureLocationWatch(getMap());
 	document.addEventListener("visibilitychange", onVisibilityChange);
 	unsubscribeLocation = onLocationUpdate(onFix);
+	persistSession();
 	void runTick();
 }
 
@@ -397,6 +481,7 @@ export function stopFollowMe() {
 
 	active = false;
 	status = "off";
+	clearPersistedSession();
 
 	if (timer) clearTimeout(timer);
 	timer = undefined;
