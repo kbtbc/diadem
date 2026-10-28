@@ -4,6 +4,7 @@ import {
 	onLocationUpdate
 } from "@/lib/map/geolocate.svelte";
 import { getMap } from "@/lib/map/map.svelte";
+import { getConfig } from "@/lib/services/config/config";
 import * as m from "@/lib/paraglide/messages";
 import { openToast } from "@/lib/ui/toasts.svelte.js";
 import { Coords } from "@/lib/utils/coordinates";
@@ -11,6 +12,7 @@ import { encodeRequestBody, getHeaders, parseResponse } from "@/lib/utils/reques
 import {
 	FOLLOW_ME_MAX_INTERVAL_MS,
 	medianSpeedKmh,
+	resolveSpeedLimits,
 	shouldScan as decideScan,
 	speedGateBlocks as decideSpeedGate,
 	type SpeedSample
@@ -185,7 +187,12 @@ function recordSpeed() {
  * FOLLOW_ME_MAX_SPEED_KMH and only clears below FOLLOW_ME_RESUME_SPEED_KMH.
  */
 function speedGateBlocks(): boolean {
-	speedPaused = decideSpeedGate(getFollowMeSpeedKmh(), speedPaused);
+	const limits = getConfig()?.followMe;
+	speedPaused = decideSpeedGate(
+		getFollowMeSpeedKmh(),
+		speedPaused,
+		resolveSpeedLimits(limits?.maxSpeedKmh, limits?.resumeSpeedKmh)
+	);
 	return speedPaused;
 }
 
