@@ -1,5 +1,5 @@
 import { getHex7Coords } from "@/lib/features/followMe/hexGeometry";
-import { addScoutEntries } from "@/lib/server/api/dragoniteApi";
+import { addScoutEntries, getScoutQueue } from "@/lib/server/api/dragoniteApi";
 import { readRequestBody } from "@/lib/server/api/requestBody";
 import { respond } from "@/lib/server/api/respond";
 import { result } from "@/lib/server/api/results";
@@ -19,6 +19,19 @@ import { getLogger } from "@/lib/utils/logger";
 import { error } from "@sveltejs/kit";
 
 const log = getLogger("followme");
+
+/**
+ * Scout queue depth, so the client can tell when a scan it queued has
+ * actually been worked through. Queueing is instant; the scan is not.
+ */
+export async function GET({ locals, request }) {
+	if (!hasFeatureAnywhereServer(locals.perms, Features.FOLLOW_ME, locals.user)) error(401);
+
+	const queue = await getScoutQueue();
+	if (queue === undefined) return respond(request, result(undefined, "Internal Error"));
+
+	return respond(request, result({ queue }));
+}
 
 type FollowMeRequest = {
 	lat?: number;

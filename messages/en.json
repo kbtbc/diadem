@@ -1071,5 +1071,7 @@
 	"followme_scan_one": "1 scan",
 	"followme_covered_title": "Already in an existing scan area",
 	"followme_covered_lead": "Follow-Me only works outside existing",
-	"followme_covered_link": "scan boundaries"
+	"followme_covered_link": "scan boundaries",
+	"followme_toast_done": "Scan finished, {count} points covered",
+	"followme_toast_slow": "Scouts are busy, your scan is still running"
 }
