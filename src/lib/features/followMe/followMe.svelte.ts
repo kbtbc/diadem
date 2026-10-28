@@ -198,6 +198,12 @@ async function requestScan(center: Coords): Promise<void> {
 		lastScanAt = Date.now();
 		scanCount += 1;
 		status = "idle";
+
+		// Only the first: the chip's counter shows the rest, and a toast every
+		// five minutes would wear out its welcome.
+		if (scanCount === 1) {
+			openToast(m.followme_toast_scanned({ count: data.result.locations ?? 0 }));
+		}
 		return;
 	}
 

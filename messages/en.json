@@ -1060,5 +1060,7 @@
 	"tool_follow_me_description": "Scan around you as you move",
 	"followme_status_too_fast_at": "Paused, {speed} km/h",
 	"followme_stopped_covered": "Follow me turned off: you're inside an area we already scan",
-	"followme_stopped_quota": "Follow me turned off: hourly scan limit reached"
+	"followme_stopped_quota": "Follow me turned off: hourly scan limit reached",
+	"followme_chip_stop": "Tap to stop following",
+	"followme_toast_scanned": "Scanning {count} points around you"
 }
