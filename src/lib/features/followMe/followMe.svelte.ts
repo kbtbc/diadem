@@ -12,6 +12,7 @@ import { encodeRequestBody, getHeaders, parseResponse } from "@/lib/utils/reques
 import {
 	FOLLOW_ME_MAX_INTERVAL_MS,
 	medianSpeedKmh,
+	resolveMinInterval,
 	resolveSpeedLimits,
 	shouldScan as decideScan,
 	speedGateBlocks as decideSpeedGate,
@@ -26,9 +27,19 @@ export {
 	FOLLOW_ME_RESUME_SPEED_KMH
 } from "./followMePolicy";
 
+/** Unchanged: a session that cannot get a scan away for this long is stuck. */
 export const FOLLOW_ME_IDLE_TIMEOUT_MS = 30 * 60_000;
-export const FOLLOW_ME_SESSION_TIMEOUT_MS = 60 * 60_000;
-export const FOLLOW_ME_HIDDEN_TIMEOUT_MS = 5 * 60_000;
+
+/** A playing session, not an hour - users were hitting the old cap mid-outing. */
+export const FOLLOW_ME_SESSION_TIMEOUT_MS = 3 * 60 * 60_000;
+
+/**
+ * Switching to the game is the entire point of the feature, and walking to a
+ * spawn and catching it routinely takes more than the five minutes this used
+ * to allow - so the map going to the background was turning follow-me off
+ * exactly when it was working.
+ */
+export const FOLLOW_ME_HIDDEN_TIMEOUT_MS = 30 * 60_000;
 
 /** Poll rate while the user is on the move. */
 const TICK_MOVING_MS = 5_000;
@@ -202,7 +213,8 @@ function shouldScan(now: number, center: Coords): boolean {
 		center: center.internal(),
 		lastScanCenter: lastScanCenter?.internal(),
 		lastScanAt,
-		backoffUntil
+		backoffUntil,
+		minIntervalMs: resolveMinInterval(getConfig()?.followMe?.minScanIntervalSeconds)
 	});
 }
 

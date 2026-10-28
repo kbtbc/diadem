@@ -3,6 +3,7 @@ import { speedFromFixes, type SpeedFix } from "@/lib/utils/fixSpeed";
 import {
 	FOLLOW_ME_MAX_INTERVAL_MS,
 	FOLLOW_ME_MIN_INTERVAL_MS,
+	resolveMinInterval,
 	FOLLOW_ME_MAX_SPEED_KMH,
 	FOLLOW_ME_RESUME_SPEED_KMH,
 	medianSpeedKmh,
@@ -24,6 +25,7 @@ function state(overrides: Partial<ScanState> = {}): ScanState {
 		lastScanCenter: HERE,
 		lastScanAt: NOW - FOLLOW_ME_MIN_INTERVAL_MS - 1,
 		backoffUntil: 0,
+		minIntervalMs: FOLLOW_ME_MIN_INTERVAL_MS,
 		...overrides
 	};
 }
@@ -55,6 +57,29 @@ describe("follow-me scan decision", () => {
 	it("rescans once the user leaves half the footprint behind", () => {
 		expect(shouldScan(state({ center: east(100) }))).toBe(false);
 		expect(shouldScan(state({ center: east(250) }))).toBe(true);
+	});
+
+	it("honours a configured floor", () => {
+		const twoMinutes = resolveMinInterval(120);
+		expect(twoMinutes).toBe(120_000);
+		// moved far, but inside the configured floor
+		expect(
+			shouldScan(
+				state({ lastScanAt: NOW - 90_000, center: east(5_000), minIntervalMs: twoMinutes })
+			)
+		).toBe(false);
+		expect(
+			shouldScan(
+				state({ lastScanAt: NOW - 130_000, center: east(5_000), minIntervalMs: twoMinutes })
+			)
+		).toBe(true);
+	});
+
+	it("will not let config drop the floor to nothing", () => {
+		expect(resolveMinInterval(undefined)).toBe(FOLLOW_ME_MIN_INTERVAL_MS);
+		expect(resolveMinInterval(0)).toBe(FOLLOW_ME_MIN_INTERVAL_MS);
+		expect(resolveMinInterval(-5)).toBe(FOLLOW_ME_MIN_INTERVAL_MS);
+		expect(resolveMinInterval(1)).toBe(15_000);
 	});
 
 	it("rescans a stationary user at the ceiling", () => {
