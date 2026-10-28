@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getKojiGeofences, type KojiFeature } from "@/lib/features/koji";
+	import { compareAreaNames, groupByState } from "@/lib/features/coverageGroups";
 	import Button from "@/components/ui/input/Button.svelte";
 	import LucideIcon from "@/components/utils/LucideIcon.svelte";
 	import { ChevronRight } from "@lucide/svelte";
@@ -62,7 +63,7 @@
 
 	{#if isExpanded}
 		<div class="pl-6" transition:slide={{ duration: 150 }}>
-			{#each area.properties.children as child (child.properties.id)}
+			{#each [...area.properties.children].sort(compareAreaNames) as child (child.properties.id)}
 				<div class="w-full flex py-2 items-center pl-2 pr-2 gap-3 text-sm font-medium">
 					{@render areaTitle(child)}
 					{@render jumpButton(child)}
@@ -74,10 +75,14 @@
 
 <div class="overflow-hidden">
 	{#if hasLoadedFeature(LoadedFeature.KOJI)}
-		{#each getKojiGeofences() as area (area.properties.id)}
-			{#if !area.properties.parent}
+		{#each groupByState(getKojiGeofences().filter((a) => !a.properties.parent)) as group (group.code)}
+			<h3 class="px-2 pt-4 pb-1 text-xs font-semibold uppercase tracking-wide opacity-70">
+				{group.name}
+				<span class="font-normal">({group.areas.length})</span>
+			</h3>
+			{#each group.areas as area (area.properties.id)}
 				{@render areaEntry(area)}
-			{/if}
+			{/each}
 		{/each}
 	{/if}
 </div>
