@@ -4,8 +4,8 @@
 	import { isSearchViewActive } from "@/lib/features/activeSearch.svelte";
 	import {
 		getFollowMeActive,
+		getFollowMeChipLabel,
 		getFollowMeStatus,
-		getFollowMeSummary,
 		stopFollowMe
 	} from "@/lib/features/followMe/followMe.svelte.js";
 	import * as m from "@/lib/paraglide/messages";
@@ -28,7 +28,7 @@
 			title={m.followme_chip_stop()}
 		>
 			<IconValue Icon={paused ? LocateOff : LocateFixed} class={paused ? "opacity-70" : ""}>
-				<span class="whitespace-nowrap">{getFollowMeSummary()}</span>
+				<span class="whitespace-nowrap">{getFollowMeChipLabel()}</span>
 			</IconValue>
 		</Button>
 	</div>
