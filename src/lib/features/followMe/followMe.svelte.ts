@@ -48,6 +48,15 @@ export const FOLLOW_ME_NOTICE_MS = 10_000;
 /** Long enough to read, for the toasts that explain why it stopped. */
 const TOAST_EXPLAIN_MS = 6_000;
 
+/** How often to ask whether the scout queue has worked through our scan. */
+const COMPLETION_POLL_MS = 2_000;
+
+/**
+ * Stop waiting after this. A scan of 49 points clears in about ten seconds on
+ * a quiet pool, so anything past this is the pool being busy, not our scan.
+ */
+const COMPLETION_GIVE_UP_MS = 40_000;
+
 /** Poll rate while the user is on the move. */
 /**
  * Android Chrome discards backgrounded tabs, so switching to the game and back
@@ -96,6 +105,7 @@ let unsubscribeLocation: (() => void) | undefined = undefined;
 let restoreAttempted = false;
 let noticeKind: "covered" | undefined = $state(undefined);
 let noticeTimer: ReturnType<typeof setTimeout> | undefined = undefined;
+let completionTimer: ReturnType<typeof setTimeout> | undefined = undefined;
 
 /**
  * A reason worth leaving on screen after the feature switched itself off.
@@ -269,6 +279,57 @@ function autoStopReason(now: number): string | undefined {
 	return undefined;
 }
 
+function stopCompletionWatch() {
+	if (completionTimer) clearTimeout(completionTimer);
+	completionTimer = undefined;
+}
+
+/**
+ * Wait for the scout queue to drain, then say so.
+ *
+ * The queue is shared, so a busy pool can hold it above zero past our own
+ * scan - which only ever makes this report late, never early. If it has not
+ * drained by COMPLETION_GIVE_UP_MS we say it is still running rather than
+ * claim a finish we cannot see.
+ */
+function watchScanCompletion(points: number) {
+	stopCompletionWatch();
+	const startedAt = Date.now();
+
+	const poll = async () => {
+		if (!active) return;
+
+		let queue: number | undefined;
+		try {
+			const response = await fetch("/api/follow-me", { headers: getHeaders() });
+			const data = await parseResponse<{ result?: { queue: number } }>(response);
+			queue = data.result?.queue;
+		} catch {
+			// leave it undefined and let the give-up clock decide
+		}
+
+		if (!active) return;
+
+		if (queue === 0) {
+			if (status === "scanning") status = "idle";
+			openToast(m.followme_toast_done({ count: points }));
+			completionTimer = undefined;
+			return;
+		}
+
+		if (Date.now() - startedAt >= COMPLETION_GIVE_UP_MS) {
+			if (status === "scanning") status = "idle";
+			openToast(m.followme_toast_slow(), TOAST_EXPLAIN_MS);
+			completionTimer = undefined;
+			return;
+		}
+
+		completionTimer = setTimeout(() => void poll(), COMPLETION_POLL_MS);
+	};
+
+	completionTimer = setTimeout(() => void poll(), COMPLETION_POLL_MS);
+}
+
 async function requestScan(center: Coords): Promise<void> {
 	const encoded = encodeRequestBody(center.internal());
 	const response = await fetch("/api/follow-me", {
@@ -295,10 +356,14 @@ async function requestScan(center: Coords): Promise<void> {
 		lastScanCenter = center;
 		lastScanAt = Date.now();
 		scanCount += 1;
-		status = "idle";
 		persistSession();
 
-		openToast(m.followme_toast_scanned({ count: data.result.locations ?? 0 }));
+		// Status stays "scanning" until the queue has actually worked through
+		// it - queueing is instant, the scan is not, and a tester could not tell
+		// whether a scan with no visible spawns had finished or failed.
+		const points = data.result.locations ?? 0;
+		openToast(m.followme_toast_scanned({ count: points }));
+		watchScanCompletion(points);
 		return;
 	}
 
@@ -353,7 +418,8 @@ async function tick() {
 
 	const center = new Coords(location.lat, location.lng);
 	if (!shouldScan(now, center)) {
-		if (status === "scanning" || status === "locating") status = "idle";
+		// "scanning" belongs to the completion watcher until it resolves.
+		if (status === "locating") status = "idle";
 		return;
 	}
 
@@ -523,6 +589,7 @@ export function stopFollowMe() {
 	if (timer) clearTimeout(timer);
 	timer = undefined;
 	nextWakeAt = 0;
+	stopCompletionWatch();
 	unsubscribeLocation?.();
 	unsubscribeLocation = undefined;
 	document.removeEventListener("visibilitychange", onVisibilityChange);
