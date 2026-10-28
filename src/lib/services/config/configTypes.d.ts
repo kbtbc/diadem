@@ -136,6 +136,8 @@ export type ClientConfig = {
 		showToolsMenu: boolean;
 		coverageMap: boolean;
 		scout: boolean;
+		/** Optional: absent means follow-me stays hidden. */
+		followMe?: boolean;
 	};
 };
 
@@ -197,6 +199,26 @@ export type ServerConfig = {
 		secret?: string;
 		/** Copy linked trainers to the user's Poracle accounts. Default false. */
 		syncLinkedTrainers?: boolean;
+	};
+	followMe?: {
+		/** Scans per user per hour. Default 24. */
+		scansPerHour?: number;
+		/** Concurrent followers across the instance. Default 70. */
+		maxFollowers?: number;
+		/** Back off above this scout queue depth. Default 50. */
+		queueLimit?: number;
+		/**
+		 * "overlap" skips a scan if any of its 49 points falls in a covered
+		 * area; "center" skips only when the user stands in one. Default
+		 * "overlap".
+		 */
+		overlapMode?: "overlap" | "center";
+		/**
+		 * Enabled Dragonite areas that run workers but have no pokemon
+		 * coverage, so follow-me should still scan inside them. Defaults to the
+		 * fort-only areas.
+		 */
+		uncoveredAreas?: string[];
 	};
 	log: Log;
 	internalDb: DbCreds;

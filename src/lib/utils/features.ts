@@ -24,6 +24,7 @@ enum ExtraFeature {
 	STATION_ALL = "station*",
 
 	SCOUT = "scout",
+	FOLLOW_ME = "follow_me",
 	WEATHER = "weather",
 	COVERAGE_MAP = "coverage_map",
 	WAYFARER_MAP = "wayfarer_map",
@@ -94,7 +95,12 @@ export const featureWildcardChildren: Partial<Record<FeaturesKey, FeaturesKey[]>
 		Features.STATION_ALL,
 		Features.MINOR_MAP_OBJECT_ALL
 	],
-	[Features.TOOL_ALL]: [Features.SCOUT, Features.WAYFARER_MAP, Features.COVERAGE_MAP],
+	[Features.TOOL_ALL]: [
+		Features.SCOUT,
+		Features.FOLLOW_ME,
+		Features.WAYFARER_MAP,
+		Features.COVERAGE_MAP
+	],
 	[Features.UI_ALL]: [Features.SEARCH, Features.WEATHER]
 };
 
