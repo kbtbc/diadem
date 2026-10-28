@@ -12,6 +12,12 @@
 	import type * as icons from "@lucide/svelte";
 
 	let expandedAreas: Set<number> = new SvelteSet();
+	// State groups start collapsed; codes in here are open.
+	let expandedStates: Set<string> = new SvelteSet();
+
+	function toggleState(code: string) {
+		if (!expandedStates.delete(code)) expandedStates.add(code);
+	}
 
 	function getAreaIcon(area: KojiFeature): keyof typeof icons {
 		return (area.properties.lucideIcon ?? "Globe") as keyof typeof icons;
@@ -76,13 +82,30 @@
 <div class="overflow-hidden">
 	{#if hasLoadedFeature(LoadedFeature.KOJI)}
 		{#each groupByState(getKojiGeofences().filter((a) => !a.properties.parent)) as group (group.code)}
-			<h3 class="px-2 pt-4 pb-1 text-xs font-semibold uppercase tracking-wide opacity-70">
-				{group.name}
-				<span class="font-normal">({group.areas.length})</span>
+			{@const isOpen = expandedStates.has(group.code)}
+			<h3 class="pt-2">
+				<button
+					type="button"
+					class="w-full flex items-center gap-2 px-2 py-2 text-xs font-semibold uppercase tracking-wide opacity-70 hover:opacity-100 cursor-pointer"
+					aria-expanded={isOpen}
+					onclick={() => toggleState(group.code)}
+				>
+					<ChevronRight
+						size="14"
+						class="transition-[rotate]"
+						style="rotate: {isOpen ? '90deg' : '0deg'}"
+					/>
+					{group.name}
+					<span class="font-normal">({group.areas.length})</span>
+				</button>
 			</h3>
-			{#each group.areas as area (area.properties.id)}
-				{@render areaEntry(area)}
-			{/each}
+			{#if isOpen}
+				<div transition:slide={{ duration: 150 }}>
+					{#each group.areas as area (area.properties.id)}
+						{@render areaEntry(area)}
+					{/each}
+				</div>
+			{/if}
 		{/each}
 	{/if}
 </div>
