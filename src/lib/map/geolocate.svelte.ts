@@ -3,6 +3,7 @@ import { isNative } from "@/lib/native/runtime";
 import * as m from "@/lib/paraglide/messages";
 import { openToast } from "@/lib/ui/toasts.svelte.js";
 import { round } from "@/lib/utils/numberFormat";
+import { isUsableFix, speedFromFixes, type SpeedFix } from "@/lib/utils/fixSpeed";
 import { distance } from "@turf/turf";
 import type * as maplibre from "maplibre-gl";
 
@@ -24,27 +25,30 @@ let watchId: number | undefined = undefined;
 let animationFrame: number | undefined = undefined;
 let shouldUpdateLocation = false;
 let shouldUpdateCamera = false;
-let previousFix: { lat: number; lng: number; timestamp: number } | undefined = undefined;
+let previousFix: SpeedFix | undefined = undefined;
 
 const minZoom = 14.5;
 const maxZoom = 17.5;
 const locationAnimationDuration = 1000;
 const minLocationUpdateDistanceMeters = 2;
 
-const locationListeners = new Set<() => void>();
+const locationListeners = new Set<(moved: boolean) => void>();
 
 /**
- * Notified whenever a fix actually moves the user, so a consumer that is
- * sleeping between polls can wake early instead of waiting out its timer.
+ * Notified on every accepted fix, with whether it actually moved the user.
+ *
+ * Consumers need both: a mover lets a sleeping poller wake early, and a fix
+ * that did not move still carries a fresh speed, which is the only way a
+ * standing-still user's speed estimate ever comes back down.
  * Returns an unsubscribe function.
  */
-export function onLocationUpdate(listener: () => void) {
+export function onLocationUpdate(listener: (moved: boolean) => void) {
 	locationListeners.add(listener);
 	return () => locationListeners.delete(listener);
 }
 
-function notifyLocationListeners() {
-	for (const listener of locationListeners) listener();
+function notifyLocationListeners(moved: boolean) {
+	for (const listener of locationListeners) listener(moved);
 }
 
 export function getIsGeolocationEnabled() {
@@ -210,20 +214,22 @@ function readSpeed(
 	position: GeolocationPosition,
 	coords: { lat: number; lng: number }
 ): number | undefined {
-	const reported = position.coords.speed;
-	const previous = previousFix;
-	previousFix = { ...coords, timestamp: position.timestamp };
+	const accuracy = position.coords.accuracy;
 
+	// A vague fix is not evidence of movement, and keeping it as the baseline
+	// would make the next displacement look like a sprint. Drop it entirely and
+	// measure from the last fix worth trusting.
+	if (!isUsableFix(accuracy)) return undefined;
+
+	const previous = previousFix;
+	const current: SpeedFix = { ...coords, timestamp: position.timestamp, accuracy };
+	previousFix = current;
+
+	const reported = position.coords.speed;
 	if (reported !== null && Number.isFinite(reported) && reported >= 0) return reported;
 	if (!previous) return undefined;
 
-	const elapsedSeconds = (position.timestamp - previous.timestamp) / 1000;
-	if (elapsedSeconds <= 0) return undefined;
-
-	const moved = distance([previous.lng, previous.lat], [coords.lng, coords.lat], {
-		units: "meters"
-	});
-	return moved / elapsedSeconds;
+	return speedFromFixes(previous, current);
 }
 
 function handleGeolocationPosition(s: GeolocationPosition, map: maplibre.Map | undefined) {
@@ -275,15 +281,24 @@ function handleGeolocationPosition(s: GeolocationPosition, map: maplibre.Map | u
 		if (isLocateFollowing && map) {
 			flyToLocation(map, location);
 		}
-		notifyLocationListeners();
+		notifyLocationListeners(true);
 		return;
 	}
 
 	if (shouldMove) {
 		animateLocation(location, map);
-		notifyLocationListeners();
-	} else if (currentLocation && currentLocation.heading !== heading) {
-		currentLocation.heading = heading;
+		notifyLocationListeners(true);
+	} else {
+		if (currentLocation && currentLocation.heading !== heading) {
+			currentLocation.heading = heading;
+		}
+		// Standing still still produces fixes, and their speed is the only way
+		// an estimate left high by the last drive ever comes back down.
+		if (currentLocation) {
+			currentLocation.speed = location.speed;
+			currentLocation.timestamp = location.timestamp;
+		}
+		notifyLocationListeners(false);
 	}
 }
 
