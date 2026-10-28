@@ -6,8 +6,10 @@
 		getFollowMeActive,
 		getFollowMeChipLabel,
 		getFollowMeStatus,
+		restoreFollowMe,
 		stopFollowMe
 	} from "@/lib/features/followMe/followMe.svelte.js";
+	import { onMount } from "svelte";
 	import * as m from "@/lib/paraglide/messages";
 	import { LocateFixed, LocateOff } from "@lucide/svelte";
 	import { fade } from "svelte/transition";
@@ -16,6 +18,11 @@
 	// sign it is on is a row two taps away - which is how a beta tester ended
 	// up unable to tell whether a scan had run, or whether it was still paused.
 	let paused = $derived(getFollowMeStatus() === "too-fast");
+
+	// This chip is mounted with the map whether or not follow-me is running, so
+	// it is the natural place to pick a session back up after a reload. The
+	// store guards against being called twice.
+	onMount(() => restoreFollowMe());
 </script>
 
 {#if getFollowMeActive() && !isSearchViewActive()}

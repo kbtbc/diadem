@@ -8,6 +8,7 @@ import {
 	FOLLOW_ME_RESUME_SPEED_KMH,
 	medianSpeedKmh,
 	resolveSpeedLimits,
+	shouldResumeSession,
 	shouldScan,
 	speedGateBlocks,
 	SPEED_SAMPLE_TTL_MS,
@@ -168,6 +169,54 @@ describe("follow-me speed gate", () => {
 		const later = NOW + SPEED_SAMPLE_TTL_MS + 1;
 		paused = speedGateBlocks(medianSpeedKmh(driving, later), paused);
 		expect(paused).toBe(false);
+	});
+});
+
+describe("resuming a session after a page reload", () => {
+	const limits = { sessionMs: 3 * 60 * 60_000, idleMs: 30 * 60_000 };
+
+	it("picks up a session that is still live", () => {
+		// Android Chrome discards backgrounded tabs, so a reload is not a
+		// decision to stop - it just happens while you are in the game.
+		expect(
+			shouldResumeSession({ startedAt: NOW - 60_000, lastScanAt: NOW - 30_000 }, NOW, limits)
+		).toBe(true);
+	});
+
+	it("lets a session that outlived its cap stay dead", () => {
+		expect(
+			shouldResumeSession(
+				{ startedAt: NOW - limits.sessionMs, lastScanAt: NOW - 1_000 },
+				NOW,
+				limits
+			)
+		).toBe(false);
+	});
+
+	it("lets an idle session stay dead", () => {
+		expect(
+			shouldResumeSession(
+				{ startedAt: NOW - 60 * 60_000, lastScanAt: NOW - limits.idleMs },
+				NOW,
+				limits
+			)
+		).toBe(false);
+	});
+
+	it("measures idleness from the start when nothing was ever scanned", () => {
+		expect(shouldResumeSession({ startedAt: NOW - 60_000, lastScanAt: 0 }, NOW, limits)).toBe(true);
+		expect(
+			shouldResumeSession({ startedAt: NOW - limits.idleMs, lastScanAt: 0 }, NOW, limits)
+		).toBe(false);
+	});
+
+	it("rejects nonsense from storage", () => {
+		expect(shouldResumeSession({ startedAt: 0, lastScanAt: 0 }, NOW, limits)).toBe(false);
+		expect(shouldResumeSession({ startedAt: NaN, lastScanAt: 0 }, NOW, limits)).toBe(false);
+		// a clock that moved backwards, or a doctored entry
+		expect(shouldResumeSession({ startedAt: NOW + 60_000, lastScanAt: 0 }, NOW, limits)).toBe(
+			false
+		);
 	});
 });
 

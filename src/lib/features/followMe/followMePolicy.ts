@@ -76,6 +76,33 @@ export function resolveMinInterval(seconds: number | undefined): number {
  */
 export const FOLLOW_ME_MAX_INTERVAL_MS = 300_000;
 
+export type SessionLimits = {
+	sessionMs: number;
+	idleMs: number;
+};
+
+export type SavedSession = {
+	startedAt: number;
+	lastScanAt: number;
+};
+
+/**
+ * Whether a session found in storage is still worth picking up.
+ *
+ * Its own timeouts decide: a session that would have been auto-disabled while
+ * the page was gone must not come back from the dead on the next load.
+ */
+export function shouldResumeSession(
+	saved: SavedSession,
+	now: number,
+	limits: SessionLimits
+): boolean {
+	if (!Number.isFinite(saved.startedAt) || saved.startedAt <= 0) return false;
+	if (now < saved.startedAt) return false;
+	if (now - saved.startedAt >= limits.sessionMs) return false;
+	return now - (saved.lastScanAt || saved.startedAt) < limits.idleMs;
+}
+
 export type ScanState = {
 	now: number;
 	center: LatLon;
