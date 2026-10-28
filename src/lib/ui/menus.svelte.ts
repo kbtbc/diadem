@@ -13,7 +13,6 @@ export enum Menu {
 	PROFILE = "profile",
 	FILTERS = "filters",
 	SCOUT = "scout",
-	FOLLOW_ME = "followme",
 	TOOLS = "tools",
 	COVERAGE_MAP = "coveragemap"
 }

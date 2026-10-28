@@ -1043,10 +1043,6 @@
 	"linked_trainers_error_too_many": "You have linked the maximum number of trainers.",
 	"linked_trainers_error_queue_full": "Trainer lookups are busy or at their daily limit. Try again later.",
 	"linked_trainers_error_unavailable": "Trainer lookup is unavailable right now.",
-	"followme_title": "Follow Me",
-	"followme_description": "Scans around you as you move, so you see spawns wherever you are.",
-	"followme_start": "Start following",
-	"followme_stop": "Stop following",
 	"followme_status_off": "Not following",
 	"followme_status_locating": "Waiting for your location",
 	"followme_status_scanning": "Scanning around you",
@@ -1056,11 +1052,11 @@
 	"followme_status_quota": "Scan limit reached, try again shortly",
 	"followme_status_busy": "Scouts are busy, retrying shortly",
 	"followme_status_error": "Something went wrong while following",
-	"followme_speed": "Moving {speed} km/h, pauses above {limit} km/h",
 	"followme_scans": "{count} scans this session",
 	"followme_stopped_session": "Follow me turned off after an hour",
 	"followme_stopped_idle": "Follow me turned off after 30 minutes without a scan",
 	"followme_stopped_hidden": "Follow me turned off while the map was in the background",
-	"tool_follow_me_title": "Follow Me",
-	"tool_follow_me_description": "Scan around you as you move"
+	"tool_follow_me_title": "Follow-Me Scans",
+	"tool_follow_me_description": "Scan around you as you move - tap to turn on",
+	"followme_speed_short": "{speed} km/h"
 }

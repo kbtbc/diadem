@@ -16,6 +16,7 @@
 		setCurrentScoutCoords
 	} from "@/lib/features/scout.svelte";
 	import { Menu, openMenu, setJustChangedMenus } from "@/lib/ui/menus.svelte";
+	import { getFollowMeSummary, toggleFollowMe } from "@/lib/features/followMe/followMe.svelte";
 	import { getMap } from "@/lib/map/map.svelte";
 	import { Coords } from "@/lib/utils/coordinates";
 	import { getDefaultMapStyle } from "@/lib/services/themeMode";
@@ -44,11 +45,8 @@
 		<ToolLink
 			Icon={LocateFixed}
 			title={m.tool_follow_me_title()}
-			description={m.tool_follow_me_description()}
-			onclick={() => {
-				setJustChangedMenus();
-				openMenu(Menu.FOLLOW_ME);
-			}}
+			description={getFollowMeSummary()}
+			onclick={toggleFollowMe}
 		></ToolLink>
 	{/if}
 
