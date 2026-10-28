@@ -21,6 +21,22 @@ import { error } from "@sveltejs/kit";
 const log = getLogger("followme");
 
 /**
+ * One shape for every way a scan can be turned away, so refusals can be
+ * counted as a family. Only the success path used to be visible, which left no
+ * way to tell how often the coverage check was turning people away - the
+ * number that says whether it is too aggressive.
+ */
+function logRefusal(userKey: string, reason: string, detail?: string) {
+	log.info(
+		"Follow-me scan refused / user: %s / reason: %s / followers: %d%s",
+		userKey,
+		reason,
+		getFollowerCount(),
+		detail ? " / " + detail : ""
+	);
+}
+
+/**
  * Scout queue depth, so the client can tell when a scan it queued has
  * actually been worked through. Queueing is instant; the scan is not.
  */
@@ -53,16 +69,20 @@ export async function POST({ request, locals }) {
 
 	if (body.stop) {
 		releaseFollowerSlot(userKey);
+		log.info("Follow-me stopped / user: %s / followers: %d", userKey, getFollowerCount());
 		return respond(request, result({ status: "stopped" }));
 	}
 
 	const lat = Number(body.lat);
 	const lon = Number(body.lon);
 	if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+		// A warning rather than a refusal: the client should never send these.
+		log.warning("Follow-me scan refused / user: %s / reason: invalid coords", userKey);
 		return respond(request, result(undefined, "Invalid Coords"));
 	}
 
 	if (!reserveFollowerSlot(userKey)) {
+		logRefusal(userKey, "follower cap");
 		return respond(request, result({ status: "busy" }));
 	}
 
@@ -70,16 +90,34 @@ export async function POST({ request, locals }) {
 	// cannot aim 49 scouts at coordinates of its choosing.
 	const points = getHex7Coords(new Coords(lat, lon));
 
-	const overlaps = await overlapsCoveredArea(points);
-	if (overlaps === undefined) return respond(request, result({ status: "busy" }));
-	if (overlaps) return respond(request, result({ status: "covered" }));
+	const coverage = await overlapsCoveredArea(points);
+	if (coverage === undefined) {
+		// The area store did not answer, so we are blind rather than busy.
+		log.warning(
+			"Follow-me scan refused / user: %s / reason: coverage unavailable / followers: %d",
+			userKey,
+			getFollowerCount()
+		);
+		return respond(request, result({ status: "busy" }));
+	}
+	if (coverage.covered) {
+		logRefusal(userKey, "covered area", "area: " + coverage.area);
+		return respond(request, result({ status: "covered" }));
+	}
 
-	if (await scoutQueueIsBusy()) return respond(request, result({ status: "busy" }));
+	const scoutQueue = await scoutQueueIsBusy();
+	if (scoutQueue.busy) {
+		logRefusal(userKey, "scout queue busy", "queue: " + (scoutQueue.queue ?? "unreadable"));
+		return respond(request, result({ status: "busy" }));
+	}
 
 	// Charged last, so a scan skipped for coverage or a busy queue costs the
 	// user nothing.
 	const quota = await consumeFollowMeQuota(userKey);
-	if (!quota.ok) return respond(request, result({ status: "quota" }));
+	if (!quota.ok) {
+		logRefusal(userKey, "quota spent");
+		return respond(request, result({ status: "quota" }));
+	}
 
 	const username = "Diadem FM: " + (locals.user?.name || "<unknown user>");
 	const success = await addScoutEntries(
@@ -89,6 +127,11 @@ export async function POST({ request, locals }) {
 
 	if (!success) {
 		await refundFollowMeQuota(userKey);
+		log.error(
+			"Follow-me scan failed to queue / user: %s / locations: %d / quota point refunded",
+			userKey,
+			points.length
+		);
 		return respond(request, result(undefined, "Internal Error"));
 	}
 
