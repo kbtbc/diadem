@@ -1,58 +1,40 @@
 import { getDragoniteAreas } from "@/lib/server/api/dragoniteApi";
-import { fetchKojiGeofences } from "@/lib/server/api/kojiApi";
 import { getServerConfig } from "@/lib/services/config/config.server";
-import type { KojiFeature } from "@/lib/features/koji";
 import type { Coords } from "@/lib/utils/coordinates";
 import { getLogger } from "@/lib/utils/logger";
 import { booleanPointInPolygon } from "@turf/turf";
+import type { Feature, Polygon } from "geojson";
 
 const log = getLogger("followme");
 
-/**
- * Enabled Dragonite areas that run workers but have no pokemon coverage, so a
- * follow-me user standing in one still sees nothing and should be scanned.
- *
- * /status reports no mode per worker manager, so this cannot be derived from
- * the API - these three are fort-only (verified against dragonite.area,
- * 2026-10-28). Override with [server.followMe] uncoveredAreas.
- */
-const DEFAULT_UNCOVERED_AREAS = ["GA-ATL-FORTS", "MO-STL", "TX-Austin-Fort"];
-
 const CACHE_MS = 5 * 60_000;
 
-let cache: { at: number; polygons: KojiFeature[] } | undefined = undefined;
+let cache: { at: number; polygons: Feature<Polygon>[] } | undefined = undefined;
 
-async function getCoveredPolygons(thisFetch: typeof fetch): Promise<KojiFeature[] | undefined> {
+/**
+ * The areas we already scan for pokemon, as polygons.
+ *
+ * Both the list and the geofences come from Dragonite's own area store, so
+ * there is nothing to match up by name. This used to cross Dragonite's
+ * /status against Koji's geofences, which was wrong twice over: /status
+ * reports running worker managers rather than the store, so it drifted from
+ * the area table in both directions, and it says nothing about which mode an
+ * area runs, which meant keeping a hand-written list of the fort-only ones.
+ */
+async function getCoveredPolygons(): Promise<Feature<Polygon>[] | undefined> {
 	if (cache && Date.now() - cache.at < CACHE_MS) return cache.polygons;
 
-	const [geofences, areas] = await Promise.all([
-		fetchKojiGeofences(thisFetch),
-		getDragoniteAreas()
-	]);
-	if (!geofences || !areas) return undefined;
+	const areas = await getDragoniteAreas();
+	if (!areas) return undefined;
 
-	const config = getServerConfig().followMe;
-	const uncovered = new Set(config?.uncoveredAreas ?? DEFAULT_UNCOVERED_AREAS);
+	// The same three conditions the area table uses for "this ground is
+	// covered for pokemon": enabled, pokemon mode on, and workers on it.
+	const polygons = areas
+		.filter((area) => area.enabled && area.enablePokemon && area.pokemonWorkers > 0)
+		.map((area) => area.geofence)
+		.filter((geofence): geofence is Feature<Polygon> => Boolean(geofence));
 
-	// Worker counts are deliberately not consulted. Every enabled area had
-	// workers when this was measured, so the condition bought nothing, and an
-	// area sitting at zero workers for a moment is still an area we cover.
-	const covered = new Set(
-		[
-			...areas.filter((area) => area.enabled).map((area) => area.name),
-			...(config?.coveredAreas ?? [])
-		].filter((name) => !uncovered.has(name))
-	);
-
-	// Raw Koji names deliberately: kojiRules hides and renames areas for the
-	// coverage menu only, and an area hidden from that menu is still scanned.
-	const polygons = geofences.filter((feature) => covered.has(feature.properties.name));
-
-	log.debug(
-		"Follow-me coverage: %d covered areas of %d geofences",
-		polygons.length,
-		geofences.length
-	);
+	log.debug("Follow-me coverage: %d covered areas of %d", polygons.length, areas.length);
 	cache = { at: Date.now(), polygons };
 	return polygons;
 }
@@ -63,16 +45,13 @@ async function getCoveredPolygons(thisFetch: typeof fetch): Promise<KojiFeature[
  * Returns undefined when coverage cannot be determined - the caller backs off
  * rather than guessing, because guessing wrong spends 49 scouts.
  *
- * "overlap" (the default) skips the scan if any of its 49 points falls inside a
- * covered area, so no scout is spent on covered ground. "center" skips only
+ * "overlap" (the default) skips the scan if any of its 49 points falls inside
+ * a covered area, so no scout is spent on covered ground. "center" skips only
  * when the user themselves stands inside one, which scans the fringes of our
  * areas at the cost of some duplicated points.
  */
-export async function overlapsCoveredArea(
-	points: Coords[],
-	thisFetch: typeof fetch
-): Promise<boolean | undefined> {
-	const polygons = await getCoveredPolygons(thisFetch);
+export async function overlapsCoveredArea(points: Coords[]): Promise<boolean | undefined> {
+	const polygons = await getCoveredPolygons();
 	if (!polygons) return undefined;
 
 	const mode = getServerConfig().followMe?.overlapMode ?? "overlap";

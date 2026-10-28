@@ -51,7 +51,9 @@ export class TappableQuery extends DbMapObjectQuery<TappableData, FilterTappable
 				values.push(...items);
 			}
 			if (candy.length) {
-				clauses.push(`(reward_type = 'pokemon_candy' AND reward_pokemon_id IN (${placeholders(candy)}))`);
+				clauses.push(
+					`(reward_type = 'pokemon_candy' AND reward_pokemon_id IN (${placeholders(candy)}))`
+				);
 				values.push(...candy);
 			}
 		}

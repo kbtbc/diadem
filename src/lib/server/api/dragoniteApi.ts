@@ -1,4 +1,5 @@
 import { getServerConfig } from "@/lib/services/config/config.server";
+import type { Feature, Polygon } from "geojson";
 import { getLogger } from "@/lib/utils/logger";
 
 const log = getLogger("dragonite");
@@ -46,40 +47,47 @@ export async function addScoutEntries(username: string, locations: number[][]) {
 export type DragoniteArea = {
 	name: string;
 	enabled: boolean;
-	expectedWorkers: number;
+	enablePokemon: boolean;
+	pokemonWorkers: number;
+	geofence: Feature<Polygon> | undefined;
 };
 
 /**
- * Areas Dragonite is running, with their worker totals.
+ * Areas as Dragonite's own area store has them, with their geofences.
  *
- * /status reports no mode per worker manager, so "does this area have pokemon
- * coverage" cannot be answered from here alone - followMeAreas.ts subtracts the
- * fort/quest-only areas named in config.
+ * /v2/areas/ is the authoritative list: checked against the area table, it
+ * matched row for row. /status is not - it reports the running worker
+ * managers, which had drifted from the store in both directions, and it
+ * carries no mode information at all.
+ *
+ * per_page defaults to 50, so the whole set has to be asked for; 1000 is the
+ * API's maximum and there are 56 areas today.
  */
 export async function getDragoniteAreas(): Promise<DragoniteArea[] | undefined> {
-	const url = new URL("status", getServerConfig().dragonite.url);
+	const url = new URL("v2/areas/", getServerConfig().dragonite.url);
+	url.searchParams.set("per_page", "1000");
+
 	const response = await fetch(url, { headers: getHeaders() });
 
 	if (!response.ok) {
-		log.error("Error while getting dragonite status [%d]", response.status);
+		log.error("Error while getting dragonite areas [%d]", response.status);
 		return undefined;
 	}
 
 	const data = (await response.json()) as {
-		areas?: {
-			name: string;
-			enabled: boolean;
-			worker_managers?: { expected_workers?: number }[];
-		}[];
-	};
+		name: string;
+		enabled?: boolean;
+		enable_pokemon?: boolean;
+		pokemon_mode?: { workers?: number };
+		geofence?: Feature<Polygon>;
+	}[];
 
-	return (data.areas ?? []).map((area) => ({
+	return data.map((area) => ({
 		name: area.name,
 		enabled: Boolean(area.enabled),
-		expectedWorkers: (area.worker_managers ?? []).reduce(
-			(total, manager) => total + (manager.expected_workers ?? 0),
-			0
-		)
+		enablePokemon: Boolean(area.enable_pokemon),
+		pokemonWorkers: area.pokemon_mode?.workers ?? 0,
+		geofence: area.geofence
 	}));
 }
 

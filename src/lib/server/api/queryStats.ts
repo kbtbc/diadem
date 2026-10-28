@@ -295,9 +295,15 @@ async function queryActiveTappables(): Promise<ActiveTappables> {
 	};
 	const active = "expire_timestamp > UNIX_TIMESTAMP()";
 	const [pokemon, item, candy] = await Promise.all([
-		rows(`SELECT pokemon_id AS id, COUNT(*) AS count FROM tappable WHERE pokemon_id IS NOT NULL AND ${active} GROUP BY 1`),
-		rows(`SELECT item_id AS id, COUNT(*) AS count FROM tappable WHERE item_id IS NOT NULL AND ${active} GROUP BY 1`),
-		rows(`SELECT reward_pokemon_id AS id, COUNT(*) AS count FROM tappable WHERE reward_type = 'pokemon_candy' AND reward_pokemon_id IS NOT NULL AND ${active} GROUP BY 1`)
+		rows(
+			`SELECT pokemon_id AS id, COUNT(*) AS count FROM tappable WHERE pokemon_id IS NOT NULL AND ${active} GROUP BY 1`
+		),
+		rows(
+			`SELECT item_id AS id, COUNT(*) AS count FROM tappable WHERE item_id IS NOT NULL AND ${active} GROUP BY 1`
+		),
+		rows(
+			`SELECT reward_pokemon_id AS id, COUNT(*) AS count FROM tappable WHERE reward_type = 'pokemon_candy' AND reward_pokemon_id IS NOT NULL AND ${active} GROUP BY 1`
+		)
 	]);
 	return { pokemon, item, candy };
 }

@@ -221,18 +221,11 @@ export type ServerConfig = {
 		 * "overlap".
 		 */
 		overlapMode?: "overlap" | "center";
-		/**
-		 * Enabled Dragonite areas that run workers but have no pokemon
-		 * coverage, so follow-me should still scan inside them. Defaults to the
-		 * fort-only areas.
+		/*
+		 * There is deliberately no covered/uncovered area list here any more:
+		 * coverage comes from Dragonite's /v2/areas/, which carries the mode
+		 * flags and the geofences, so there is nothing left to correct by hand.
 		 */
-		uncoveredAreas?: string[];
-		/**
-		 * Extra area names to treat as covered. For drift between Dragonite's
-		 * runtime area list and the area table - /status has been seen missing
-		 * an area that the table has enabled.
-		 */
-		coveredAreas?: string[];
 	};
 	log: Log;
 	internalDb: DbCreds;
