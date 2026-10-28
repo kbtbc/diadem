@@ -56,8 +56,19 @@ export function resolveSpeedLimits(
  */
 export const FOLLOW_ME_REFRESH_METERS = 180;
 
-/** Floor between scans, so a jittery fix cannot burn 49 scouts in a row. */
+/**
+ * Floor between scans, so a jittery fix cannot burn 49 scouts in a row.
+ * Overridable with [client.followMe] minScanIntervalSeconds.
+ */
 export const FOLLOW_ME_MIN_INTERVAL_MS = 90_000;
+
+/** Never let config drop the floor below this, whatever it says. */
+const FLOOR_FLOOR_MS = 15_000;
+
+export function resolveMinInterval(seconds: number | undefined): number {
+	if (!Number.isFinite(seconds) || (seconds as number) <= 0) return FOLLOW_ME_MIN_INTERVAL_MS;
+	return Math.max((seconds as number) * 1000, FLOOR_FLOOR_MS);
+}
 
 /**
  * Ceiling between scans. 82% of spawns live 10-30 minutes, so refreshing a
@@ -73,6 +84,8 @@ export type ScanState = {
 	lastScanAt: number;
 	/** Set after a transient refusal; nothing is asked for until it passes. */
 	backoffUntil: number;
+	/** Floor between scans; see resolveMinInterval. */
+	minIntervalMs: number;
 };
 
 /**
@@ -88,7 +101,7 @@ export function shouldScan(state: ScanState): boolean {
 
 	const elapsed = state.now - state.lastScanAt;
 	if (elapsed >= FOLLOW_ME_MAX_INTERVAL_MS) return true;
-	if (elapsed < FOLLOW_ME_MIN_INTERVAL_MS) return false;
+	if (elapsed < state.minIntervalMs) return false;
 
 	const moved = rangeDistanceMeters(
 		[state.lastScanCenter.lon, state.lastScanCenter.lat],

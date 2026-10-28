@@ -144,6 +144,8 @@ export type ClientConfig = {
 		maxSpeedKmh?: number;
 		/** Resume below this. Default 78% of maxSpeedKmh, so 35. */
 		resumeSpeedKmh?: number;
+		/** Floor between scans. Default 60, never less than 15. */
+		minScanIntervalSeconds?: number;
 	};
 };
 
