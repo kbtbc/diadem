@@ -31,11 +31,17 @@ async function getCoveredPolygons(thisFetch: typeof fetch): Promise<KojiFeature[
 	]);
 	if (!geofences || !areas) return undefined;
 
-	const uncovered = new Set(getServerConfig().followMe?.uncoveredAreas ?? DEFAULT_UNCOVERED_AREAS);
+	const config = getServerConfig().followMe;
+	const uncovered = new Set(config?.uncoveredAreas ?? DEFAULT_UNCOVERED_AREAS);
+
+	// Worker counts are deliberately not consulted. Every enabled area had
+	// workers when this was measured, so the condition bought nothing, and an
+	// area sitting at zero workers for a moment is still an area we cover.
 	const covered = new Set(
-		areas
-			.filter((area) => area.enabled && area.expectedWorkers > 0 && !uncovered.has(area.name))
-			.map((area) => area.name)
+		[
+			...areas.filter((area) => area.enabled).map((area) => area.name),
+			...(config?.coveredAreas ?? [])
+		].filter((name) => !uncovered.has(name))
 	);
 
 	// Raw Koji names deliberately: kojiRules hides and renames areas for the

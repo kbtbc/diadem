@@ -219,6 +219,12 @@ export type ServerConfig = {
 		 * fort-only areas.
 		 */
 		uncoveredAreas?: string[];
+		/**
+		 * Extra area names to treat as covered. For drift between Dragonite's
+		 * runtime area list and the area table - /status has been seen missing
+		 * an area that the table has enabled.
+		 */
+		coveredAreas?: string[];
 	};
 	log: Log;
 	internalDb: DbCreds;
