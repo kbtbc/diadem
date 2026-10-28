@@ -26,6 +26,8 @@ let animationFrame: number | undefined = undefined;
 let shouldUpdateLocation = false;
 let shouldUpdateCamera = false;
 let previousFix: SpeedFix | undefined = undefined;
+let cameraFollowMap: maplibre.Map | undefined = undefined;
+let watchPinned = false;
 
 const minZoom = 14.5;
 const maxZoom = 17.5;
@@ -71,11 +73,61 @@ export function setIsLocateFollowing(state: boolean) {
 	isLocateFollowing = state;
 }
 
+/** Whether the camera is currently chasing the user. */
+export function getIsCameraFollowing() {
+	return isLocateFollowing;
+}
+
+/**
+ * Keep the position watch alive through resetLocate().
+ *
+ * The locate button's second tap is resetLocate(), which tears down the watch
+ * along with the camera. Follow-me needs the fix stream whatever the camera is
+ * doing, so while it is running the teardown stops at the camera.
+ */
+export function pinLocationWatch(pinned: boolean) {
+	watchPinned = pinned;
+}
+
+/**
+ * Have the camera follow the user, and let go the moment they take hold of the
+ * map themselves.
+ *
+ * Fighting someone who is trying to look two streets over is worse than not
+ * following at all, so a drag always wins; the chip re-engages. Zoom is left
+ * alone - pinching to see more of the area around you is not a request to stop
+ * following. The dragstart hook is what the commented-out line in
+ * animateLocation was reaching for.
+ */
+export function startCameraFollow(map: maplibre.Map | undefined) {
+	isLocateFollowing = true;
+
+	if (map && map !== cameraFollowMap) {
+		cameraFollowMap?.off("dragstart", stopCameraFollow);
+		map.on("dragstart", stopCameraFollow);
+		cameraFollowMap = map;
+	}
+
+	// With no fix yet there is nothing to fly to: the first one takes itself
+	// there, because the camera is following by then.
+	if (map && currentLocation) flyToLocation(map, currentLocation);
+}
+
+export function stopCameraFollow() {
+	isLocateFollowing = false;
+	shouldUpdateCamera = false;
+}
+
 export function resetLocate() {
 	getMap()?.stop();
-	isLocateFollowing = false;
+	stopCameraFollow();
+
+	// Follow-me is still running and still needs the fixes, so the teardown
+	// stops at the camera. Without this, a second tap of the locate button left
+	// the feature on with no location to scan around.
+	if (watchPinned) return;
+
 	shouldUpdateLocation = false;
-	shouldUpdateCamera = false;
 
 	if (watchId !== undefined) {
 		navigator.geolocation.clearWatch(watchId);
@@ -102,7 +154,6 @@ function animateLocation(location: Location, map: maplibre.Map | undefined) {
 	const startLocation = currentLocation;
 	const startTime = performance.now();
 	if (isLocateFollowing && map && shouldUpdateCamera) {
-		// map.once("dragstart", () => map.stop())
 		map.panTo([location.lng, location.lat], {
 			duration: locationAnimationDuration
 		});
@@ -306,8 +357,10 @@ function handleGeolocationPosition(s: GeolocationPosition, map: maplibre.Map | u
  * Make sure a position watch is running, without touching camera follow.
  *
  * updateLocation() is the locate button: called again while watching it toggles
- * the watch off. Follow-me needs a live fix stream and must neither cancel the
- * user's watch nor start the camera chasing them, so it comes in here instead.
+ * the watch off. Follow-me needs a live fix stream and must not cancel the
+ * user's watch, so it comes in here instead. Whether the camera then follows is
+ * the caller's business, not this function's - startCameraFollow() is its own
+ * step, and follow-me takes it.
  */
 export function ensureLocationWatch(map: maplibre.Map | undefined) {
 	if (watchId !== undefined || isFetchingLocation) return;

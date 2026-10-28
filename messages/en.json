@@ -1073,5 +1073,7 @@
 	"followme_covered_lead": "Follow-Me only works outside existing",
 	"followme_covered_link": "scan boundaries",
 	"followme_toast_done": "Scan finished, {count} points covered",
-	"followme_toast_slow": "Scouts are busy, your scan is still running"
+	"followme_toast_slow": "Scouts are busy, your scan is still running",
+	"followme_chip_recenter": "Recenter",
+	"followme_chip_recenter_title": "Have the map follow you again"
 }
