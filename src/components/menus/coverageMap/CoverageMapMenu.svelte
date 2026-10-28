@@ -12,8 +12,8 @@
 	import type * as icons from "@lucide/svelte";
 
 	let expandedAreas: Set<number> = new SvelteSet();
-	// State groups start collapsed; codes in here are open.
-	let expandedStates: Set<string> = new SvelteSet();
+	// State groups start collapsed except Georgia; codes in here are open.
+	let expandedStates: Set<string> = new SvelteSet(["GA"]);
 
 	function toggleState(code: string) {
 		if (!expandedStates.delete(code)) expandedStates.add(code);
@@ -81,7 +81,21 @@
 
 <div class="overflow-hidden">
 	{#if hasLoadedFeature(LoadedFeature.KOJI)}
-		{#each groupByState(getKojiGeofences().filter((a) => !a.properties.parent)) as group (group.code)}
+		{@const groups = groupByState(getKojiGeofences().filter((a) => !a.properties.parent))}
+		{@const allOpen = groups.every((g) => expandedStates.has(g.code))}
+		<div class="flex justify-end px-2 pt-2">
+			<Button
+				size="sm"
+				variant="ghost"
+				onclick={() => {
+					if (allOpen) expandedStates.clear();
+					else for (const g of groups) expandedStates.add(g.code);
+				}}
+			>
+				{allOpen ? m.coveragemap_collapse_all() : m.coveragemap_expand_all()}
+			</Button>
+		</div>
+		{#each groups as group (group.code)}
 			{@const isOpen = expandedStates.has(group.code)}
 			<h3 class="pt-2">
 				<button

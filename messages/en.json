@@ -460,6 +460,8 @@
 	"modifier_show_label": "Show Label",
 	"modifier_map_preview": "Map Preview",
 	"coveragemap_view": "View",
+	"coveragemap_expand_all": "Expand all",
+	"coveragemap_collapse_all": "Collapse all",
 	"search_placeholder_pokemon": "Search for Pokémon",
 	"pokemon_picker_selected": "Selected",
 	"pokemon_picker_available": "Available",
