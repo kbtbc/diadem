@@ -1,4 +1,8 @@
-import { ensureLocationWatch, getCurrentLocation } from "@/lib/map/geolocate.svelte";
+import {
+	ensureLocationWatch,
+	getCurrentLocation,
+	onLocationUpdate
+} from "@/lib/map/geolocate.svelte";
 import { getMap } from "@/lib/map/map.svelte";
 import * as m from "@/lib/paraglide/messages";
 import { openToast } from "@/lib/ui/toasts.svelte.js";
@@ -35,7 +39,12 @@ export const FOLLOW_ME_IDLE_TIMEOUT_MS = 30 * 60_000;
 export const FOLLOW_ME_SESSION_TIMEOUT_MS = 60 * 60_000;
 export const FOLLOW_ME_HIDDEN_TIMEOUT_MS = 5 * 60_000;
 
-const TICK_MS = 5_000;
+/** Poll rate while the user is on the move. */
+const TICK_MOVING_MS = 5_000;
+
+/** Below this the user counts as standing still. */
+const STATIONARY_SPEED_KMH = 1;
+
 const SPEED_SAMPLES = 3;
 
 export type FollowMeStatus =
@@ -58,7 +67,9 @@ let lastFixTimestamp: number | undefined = undefined;
 let speedSamples: number[] = [];
 let speedPaused = false;
 let inFlight = false;
-let timer: ReturnType<typeof setInterval> | undefined = undefined;
+let timer: ReturnType<typeof setTimeout> | undefined = undefined;
+let nextWakeAt = 0;
+let unsubscribeLocation: (() => void) | undefined = undefined;
 
 export function getFollowMeActive() {
 	return active;
@@ -74,6 +85,45 @@ export function getFollowMeScanCount() {
 
 export function getFollowMeLastScanAt() {
 	return lastScanAt;
+}
+
+function statusMessage(): string {
+	switch (status) {
+		case "locating":
+			return m.followme_status_locating();
+		case "scanning":
+			return m.followme_status_scanning();
+		case "idle":
+			return m.followme_status_idle();
+		case "too-fast":
+			return m.followme_status_too_fast();
+		case "covered":
+			return m.followme_status_covered();
+		case "quota":
+			return m.followme_status_quota();
+		case "busy":
+			return m.followme_status_busy();
+		case "error":
+			return m.followme_status_error();
+		default:
+			return m.followme_status_off();
+	}
+}
+
+/**
+ * One line for the Tools row: the off-state pitch when idle, otherwise what it
+ * is doing, how fast the user is going and how many scans they have had.
+ */
+export function getFollowMeSummary(): string {
+	if (!active) return m.tool_follow_me_description();
+
+	const parts: string[] = [statusMessage()];
+
+	const speed = getFollowMeSpeedKmh();
+	if (speed !== undefined) parts.push(m.followme_speed_short({ speed: speed.toFixed(1) }));
+	if (scanCount > 0) parts.push(m.followme_scans({ count: scanCount }));
+
+	return parts.join(" \u00b7 ");
 }
 
 /**
@@ -205,6 +255,43 @@ async function tick() {
 	}
 }
 
+/**
+ * How long to sleep before the next check.
+ *
+ * On the move, every TICK_MOVING_MS so displacement is noticed promptly. Once
+ * the user stops, the only thing that can still trigger a scan is the
+ * five-minute ceiling, so sleep right up to it rather than waking every few
+ * seconds - onMoved() pulls the wake-up forward again the moment they set off.
+ */
+function nextTickDelay(): number {
+	const speed = getFollowMeSpeedKmh();
+	const moving = speed === undefined || speed > STATIONARY_SPEED_KMH;
+	if (moving) return TICK_MOVING_MS;
+
+	const dueIn = lastScanAt + FOLLOW_ME_MAX_INTERVAL_MS - Date.now();
+	return Math.max(dueIn, TICK_MOVING_MS);
+}
+
+function scheduleTick(delay: number) {
+	if (timer) clearTimeout(timer);
+	nextWakeAt = Date.now() + delay;
+	timer = setTimeout(() => void runTick(), delay);
+}
+
+async function runTick() {
+	await tick();
+	if (active) scheduleTick(nextTickDelay());
+}
+
+/**
+ * A fix moved the user. Only ever pulls the next check forward, so walking
+ * does not turn every incoming fix into a tick.
+ */
+function onMoved() {
+	if (!active) return;
+	if (Date.now() + TICK_MOVING_MS < nextWakeAt - 1_000) scheduleTick(TICK_MOVING_MS);
+}
+
 function onVisibilityChange() {
 	if (document.visibilityState === "hidden") {
 		hiddenSince = Date.now();
@@ -229,8 +316,8 @@ export function startFollowMe() {
 
 	ensureLocationWatch(getMap());
 	document.addEventListener("visibilitychange", onVisibilityChange);
-	timer = setInterval(() => void tick(), TICK_MS);
-	void tick();
+	unsubscribeLocation = onLocationUpdate(onMoved);
+	void runTick();
 }
 
 export function stopFollowMe() {
@@ -239,8 +326,11 @@ export function stopFollowMe() {
 	active = false;
 	status = "off";
 
-	if (timer) clearInterval(timer);
+	if (timer) clearTimeout(timer);
 	timer = undefined;
+	nextWakeAt = 0;
+	unsubscribeLocation?.();
+	unsubscribeLocation = undefined;
 	document.removeEventListener("visibilitychange", onVisibilityChange);
 
 	// Hand the follower slot back so the concurrency cap reflects reality

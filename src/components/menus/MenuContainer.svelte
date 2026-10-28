@@ -3,7 +3,6 @@
 	import { getOpenedMenu, Menu } from "@/lib/ui/menus.svelte.js";
 	import FiltersMenu from "@/components/menus/filters/FiltersMenu.svelte";
 	import ScoutMenu from "@/components/menus/scout/ScoutMenu.svelte";
-	import FollowMeMenu from "@/components/menus/followMe/FollowMeMenu.svelte";
 	import ToolsMenu from "@/components/menus/tools/ToolsMenu.svelte";
 	import CoverageMapMenu from "@/components/menus/coverageMap/CoverageMapMenu.svelte";
 
@@ -15,8 +14,6 @@
 				return FiltersMenu;
 			case Menu.SCOUT:
 				return ScoutMenu;
-			case Menu.FOLLOW_ME:
-				return FollowMeMenu;
 			case Menu.TOOLS:
 				return ToolsMenu;
 			case Menu.COVERAGE_MAP:

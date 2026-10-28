@@ -31,6 +31,22 @@ const maxZoom = 17.5;
 const locationAnimationDuration = 1000;
 const minLocationUpdateDistanceMeters = 2;
 
+const locationListeners = new Set<() => void>();
+
+/**
+ * Notified whenever a fix actually moves the user, so a consumer that is
+ * sleeping between polls can wake early instead of waiting out its timer.
+ * Returns an unsubscribe function.
+ */
+export function onLocationUpdate(listener: () => void) {
+	locationListeners.add(listener);
+	return () => locationListeners.delete(listener);
+}
+
+function notifyLocationListeners() {
+	for (const listener of locationListeners) listener();
+}
+
 export function getIsGeolocationEnabled() {
 	return geolocationEnabled;
 }
@@ -259,11 +275,13 @@ function handleGeolocationPosition(s: GeolocationPosition, map: maplibre.Map | u
 		if (isLocateFollowing && map) {
 			flyToLocation(map, location);
 		}
+		notifyLocationListeners();
 		return;
 	}
 
 	if (shouldMove) {
 		animateLocation(location, map);
+		notifyLocationListeners();
 	} else if (currentLocation && currentLocation.heading !== heading) {
 		currentLocation.heading = heading;
 	}
