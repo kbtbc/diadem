@@ -3,6 +3,7 @@
 	import { getConfig } from "@/lib/services/config/config";
 	import { getCurrentSelectedData } from "@/lib/mapObjects/currentSelectedState.svelte.js";
 	import WeatherOverview from "@/components/map/WeatherOverview.svelte";
+	import FollowMeStatusChip from "@/components/map/FollowMeStatusChip.svelte";
 	import DataLimitNotice from "@/components/map/DataLimitNotice.svelte";
 	import { isSupportedFeature } from "@/lib/services/supportedFeatures";
 	import { closeMenu, getOpenedMenu, Menu } from "@/lib/ui/menus.svelte.js";
@@ -88,6 +89,7 @@
 			<div class="mb-auto mx-2 flex flex-col items-end gap-2">
 				<WeatherOverview />
 				<DataLimitNotice />
+				<FollowMeStatusChip />
 			</div>
 			<div class="flex">
 				{#if !isSearchViewActive()}
@@ -109,6 +111,7 @@
 			>
 				<DataLimitNotice />
 				<WeatherOverview />
+				<FollowMeStatusChip />
 			</div>
 		{/snippet}
 		{#snippet mobileBottom()}
