@@ -1,7 +1,9 @@
 import {
 	ensureLocationWatch,
 	getCurrentLocation,
-	onLocationUpdate
+	onLocationUpdate,
+	pinLocationWatch,
+	startCameraFollow
 } from "@/lib/map/geolocate.svelte";
 import { getMap } from "@/lib/map/map.svelte";
 import { getConfig } from "@/lib/services/config/config";
@@ -559,6 +561,15 @@ export function restoreFollowMe() {
 	persistSession();
 }
 
+/**
+ * Put the camera back on the user after a pan dropped it. Wired to the chip,
+ * which is the only control on screen while every menu is closed.
+ */
+export function recenterFollowMe() {
+	if (!active) return;
+	startCameraFollow(getMap());
+}
+
 export function startFollowMe() {
 	if (active) return;
 
@@ -576,6 +587,13 @@ export function startFollowMe() {
 	clearNotice();
 
 	ensureLocationWatch(getMap());
+
+	// Switching the feature on is a request to be followed: the whole point is
+	// that you are moving, and a map centred where you set off is no use. A pan
+	// drops it again, and the chip puts it back.
+	pinLocationWatch(true);
+	startCameraFollow(getMap());
+
 	document.addEventListener("visibilitychange", onVisibilityChange);
 	unsubscribeLocation = onLocationUpdate(onFix);
 	persistSession();
@@ -593,6 +611,11 @@ export function stopFollowMe() {
 	timer = undefined;
 	nextWakeAt = 0;
 	stopCompletionWatch();
+
+	// The camera is left as it is on purpose. Switching the scanner off is not a
+	// request to have the map yanked away from wherever you were looking; the
+	// locate button owns it from here.
+	pinLocationWatch(false);
 	unsubscribeLocation?.();
 	unsubscribeLocation = undefined;
 	document.removeEventListener("visibilitychange", onVisibilityChange);
