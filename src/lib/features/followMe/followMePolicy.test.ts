@@ -6,7 +6,10 @@ import {
 	resolveMinInterval,
 	FOLLOW_ME_MAX_SPEED_KMH,
 	FOLLOW_ME_RESUME_SPEED_KMH,
+	gateSpeedKmh,
+	latestSpeedKmh,
 	medianSpeedKmh,
+	RELEASE_SAMPLE_MAX_AGE_MS,
 	resolveSpeedLimits,
 	shouldResumeSession,
 	shouldScan,
@@ -94,6 +97,11 @@ function samples(metersPerSecond: number[]): SpeedSample[] {
 	return metersPerSecond.map((speed) => ({ metersPerSecond: speed, at: NOW }));
 }
 
+/** Samples with ages, as [metres per second, milliseconds old]. */
+function aged(entries: [number, number][]): SpeedSample[] {
+	return entries.map(([speed, age]) => ({ metersPerSecond: speed, at: NOW - age }));
+}
+
 describe("follow-me speed gate", () => {
 	it("trips above the limit and only clears below the resume threshold", () => {
 		expect(speedGateBlocks(FOLLOW_ME_MAX_SPEED_KMH - 5, false)).toBe(false);
@@ -105,10 +113,11 @@ describe("follow-me speed gate", () => {
 
 	it("leaves walking and traffic alone at the shipped threshold", () => {
 		// 10 km/h was a jog, and cyclists and crawling traffic tripped it.
-		for (const kmh of [5, 15, 25, 35]) {
+		// 45 was the second try, and it was ordinary town driving.
+		for (const kmh of [5, 15, 25, 35, 45, 55]) {
 			expect(speedGateBlocks(kmh, false)).toBe(false);
 		}
-		expect(speedGateBlocks(60, false)).toBe(true);
+		expect(speedGateBlocks(75, false)).toBe(true);
 	});
 
 	it("honours configured limits", () => {
@@ -158,6 +167,58 @@ describe("follow-me speed gate", () => {
 		// nothing to go on there is no reason to block.
 		expect(speedGateBlocks(undefined, true)).toBe(false);
 		expect(speedGateBlocks(undefined, false)).toBe(false);
+	});
+
+	it("reads the newest fresh sample, and ignores the ones behind it", () => {
+		// 3 m/s now, 25 m/s a few seconds ago: the gate cares about the 3.
+		expect(
+			latestSpeedKmh(
+				aged([
+					[25, 8_000],
+					[3, 1_000]
+				]),
+				NOW
+			)
+		).toBeCloseTo(10.8);
+		expect(latestSpeedKmh(aged([[25, RELEASE_SAMPLE_MAX_AGE_MS + 1]]), NOW)).toBeUndefined();
+		expect(latestSpeedKmh([], NOW)).toBeUndefined();
+	});
+
+	it("trips on the median but releases on the newest fix", () => {
+		const spike = samples([1, 1, 30, 1, 1]);
+		expect(gateSpeedKmh(spike, NOW, false)).toBe(medianSpeedKmh(spike, NOW));
+
+		const slowingDown = aged([
+			[20, 12_000],
+			[18, 9_000],
+			[16, 6_000],
+			[4, 1_000]
+		]);
+		expect(gateSpeedKmh(slowingDown, NOW, true)).toBeCloseTo(14.4);
+	});
+
+	it("lets a driver out of town traffic off pause on one good fix", () => {
+		// AntDigby's report: latched on the motorway, then held there for the
+		// whole drive home because the median was still a minute of history.
+		const justSlowed = aged([
+			[25, 14_000],
+			[25, 11_000],
+			[25, 8_000],
+			[8, 1_000]
+		]);
+		expect(medianSpeedKmh(justSlowed, NOW)!).toBeGreaterThan(FOLLOW_ME_RESUME_SPEED_KMH);
+		expect(speedGateBlocks(gateSpeedKmh(justSlowed, NOW, true), true)).toBe(false);
+	});
+
+	it("will not let one wild fix pause a stationary user", () => {
+		// The release path is deliberately thin evidence; the trip path is not.
+		const standingStill = aged([
+			[0, 9_000],
+			[0, 6_000],
+			[0, 4_000],
+			[30, 1_000]
+		]);
+		expect(speedGateBlocks(gateSpeedKmh(standingStill, NOW, false), false)).toBe(false);
 	});
 
 	it("comes off pause once stale driving samples age out", () => {

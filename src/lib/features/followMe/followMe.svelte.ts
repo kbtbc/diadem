@@ -11,6 +11,7 @@ import { Coords, type LatLon } from "@/lib/utils/coordinates";
 import { encodeRequestBody, getHeaders, parseResponse } from "@/lib/utils/requests";
 import {
 	FOLLOW_ME_MAX_INTERVAL_MS,
+	gateSpeedKmh,
 	medianSpeedKmh,
 	resolveMinInterval,
 	resolveSpeedLimits,
@@ -251,8 +252,10 @@ function recordSpeed() {
  */
 function speedGateBlocks(): boolean {
 	const limits = getConfig()?.followMe;
+	// Not getFollowMeSpeedKmh(): that is the median, which is the right number
+	// to display and the wrong one to come off a pause with.
 	speedPaused = decideSpeedGate(
-		getFollowMeSpeedKmh(),
+		gateSpeedKmh(speedSamples, Date.now(), speedPaused),
 		speedPaused,
 		resolveSpeedLimits(limits?.maxSpeedKmh, limits?.resumeSpeedKmh)
 	);

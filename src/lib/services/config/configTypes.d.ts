@@ -140,9 +140,9 @@ export type ClientConfig = {
 		followMe?: boolean;
 	};
 	followMe?: {
-		/** Pause above this ground speed. Default 45. */
+		/** Pause above this ground speed. Default 60. */
 		maxSpeedKmh?: number;
-		/** Resume below this. Default 78% of maxSpeedKmh, so 35. */
+		/** Resume below this. Default two thirds of maxSpeedKmh, so 40. */
 		resumeSpeedKmh?: number;
 		/** Floor between scans. Default 60, never less than 15. */
 		minScanIntervalSeconds?: number;
