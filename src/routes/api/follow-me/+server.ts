@@ -27,7 +27,7 @@ type FollowMeRequest = {
 	stop?: boolean;
 };
 
-export async function POST({ request, locals, fetch }) {
+export async function POST({ request, locals }) {
 	if (!hasFeatureAnywhereServer(locals.perms, Features.FOLLOW_ME, locals.user)) error(401);
 
 	// Follow-me is per-user by construction: the quota, the follower cap and the
@@ -57,7 +57,7 @@ export async function POST({ request, locals, fetch }) {
 	// cannot aim 49 scouts at coordinates of its choosing.
 	const points = getHex7Coords(new Coords(lat, lon));
 
-	const overlaps = await overlapsCoveredArea(points, fetch);
+	const overlaps = await overlapsCoveredArea(points);
 	if (overlaps === undefined) return respond(request, result({ status: "busy" }));
 	if (overlaps) return respond(request, result({ status: "covered" }));
 
