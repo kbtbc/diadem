@@ -7,33 +7,21 @@ import { getMap } from "@/lib/map/map.svelte";
 import * as m from "@/lib/paraglide/messages";
 import { openToast } from "@/lib/ui/toasts.svelte.js";
 import { Coords } from "@/lib/utils/coordinates";
-import { rangeDistanceMeters } from "@/lib/utils/rangeGeometry";
 import { encodeRequestBody, getHeaders, parseResponse } from "@/lib/utils/requests";
+import {
+	FOLLOW_ME_MAX_INTERVAL_MS,
+	medianSpeedKmh,
+	shouldScan as decideScan,
+	speedGateBlocks as decideSpeedGate
+} from "./followMePolicy";
 
-/**
- * Above this the feature pauses. Not a staleness limit - a user moving faster
- * than this will not still be in range by the time they have checked the map,
- * switched to the game and thrown a ball, so the scan would be wasted.
- */
-export const FOLLOW_ME_MAX_SPEED_KMH = 10;
-
-/** Resume below this, so a red light or a platform does not end the session. */
-export const FOLLOW_ME_RESUME_SPEED_KMH = 8;
-
-/**
- * Rescan once the user has left roughly half the guaranteed-covered footprint
- * behind (see HEX7_COVERED_RADIUS_METERS, ~371 m).
- */
-export const FOLLOW_ME_REFRESH_METERS = 180;
-
-/** Floor between scans, so a jittery fix cannot burn 49 scouts in a row. */
-export const FOLLOW_ME_MIN_INTERVAL_MS = 90_000;
-
-/**
- * Ceiling between scans. 82% of spawns live 10-30 minutes, so refreshing a
- * stationary user faster than this mostly re-returns the same pokemon.
- */
-export const FOLLOW_ME_MAX_INTERVAL_MS = 300_000;
+export {
+	FOLLOW_ME_MAX_INTERVAL_MS,
+	FOLLOW_ME_MAX_SPEED_KMH,
+	FOLLOW_ME_MIN_INTERVAL_MS,
+	FOLLOW_ME_REFRESH_METERS,
+	FOLLOW_ME_RESUME_SPEED_KMH
+} from "./followMePolicy";
 
 export const FOLLOW_ME_IDLE_TIMEOUT_MS = 30 * 60_000;
 export const FOLLOW_ME_SESSION_TIMEOUT_MS = 60 * 60_000;
@@ -42,10 +30,16 @@ export const FOLLOW_ME_HIDDEN_TIMEOUT_MS = 5 * 60_000;
 /** Poll rate while the user is on the move. */
 const TICK_MOVING_MS = 5_000;
 
+/** How long to wait after a transient refusal before asking again. */
+const FOLLOW_ME_BACKOFF_MS = 60_000;
+
 /** Below this the user counts as standing still. */
 const STATIONARY_SPEED_KMH = 1;
 
-const SPEED_SAMPLES = 3;
+const SPEED_SAMPLES = 5;
+
+/** A fix older than this says nothing about how fast the user is going now. */
+const FIX_STALENESS_MS = 15_000;
 
 export type FollowMeStatus =
 	"off" | "locating" | "scanning" | "idle" | "too-fast" | "covered" | "quota" | "busy" | "error";
@@ -69,6 +63,7 @@ let speedPaused = false;
 let inFlight = false;
 let timer: ReturnType<typeof setTimeout> | undefined = undefined;
 let nextWakeAt = 0;
+let backoffUntil = 0;
 let unsubscribeLocation: (() => void) | undefined = undefined;
 
 export function getFollowMeActive() {
@@ -117,13 +112,19 @@ function statusMessage(): string {
 export function getFollowMeSummary(): string {
 	if (!active) return m.tool_follow_me_description();
 
-	const parts: string[] = [statusMessage()];
+	// Kept short: the Tools row is one line and clips the overflow.
+	if (status === "too-fast") {
+		const speed = getFollowMeSpeedKmh();
+		return speed === undefined
+			? statusMessage()
+			: m.followme_status_too_fast_at({ speed: Math.round(speed) });
+	}
 
-	const speed = getFollowMeSpeedKmh();
-	if (speed !== undefined) parts.push(m.followme_speed_short({ speed: speed.toFixed(1) }));
-	if (scanCount > 0) parts.push(m.followme_scans({ count: scanCount }));
+	if (scanCount > 0 && (status === "idle" || status === "scanning")) {
+		return statusMessage() + " \u00b7 " + m.followme_scans({ count: scanCount });
+	}
 
-	return parts.join(" \u00b7 ");
+	return statusMessage();
 }
 
 /**
@@ -132,15 +133,17 @@ export function getFollowMeSummary(): string {
  * a single bad fix shows up as one large spike.
  */
 export function getFollowMeSpeedKmh(): number | undefined {
-	if (speedSamples.length === 0) return undefined;
-	const sorted = [...speedSamples].sort((a, b) => a - b);
-	return (sorted[Math.floor(sorted.length / 2)] * 3600) / 1000;
+	return medianSpeedKmh(speedSamples);
 }
 
 function recordSpeed() {
 	const location = getCurrentLocation();
 	if (!location || location.speed === undefined) return;
 	if (location.timestamp === lastFixTimestamp) return;
+
+	// Leftovers from the last drive must not decide the gate on the next
+	// switch-on, which is what made the toggle flip while standing still.
+	if (Date.now() - location.timestamp > FIX_STALENESS_MS) return;
 
 	lastFixTimestamp = location.timestamp;
 	speedSamples.push(location.speed);
@@ -152,27 +155,18 @@ function recordSpeed() {
  * FOLLOW_ME_MAX_SPEED_KMH and only clears below FOLLOW_ME_RESUME_SPEED_KMH.
  */
 function speedGateBlocks(): boolean {
-	const speed = getFollowMeSpeedKmh();
-	if (speed === undefined) return false;
-
-	if (speedPaused) {
-		if (speed <= FOLLOW_ME_RESUME_SPEED_KMH) speedPaused = false;
-	} else if (speed > FOLLOW_ME_MAX_SPEED_KMH) {
-		speedPaused = true;
-	}
-
+	speedPaused = decideSpeedGate(getFollowMeSpeedKmh(), speedPaused);
 	return speedPaused;
 }
 
 function shouldScan(now: number, center: Coords): boolean {
-	if (!lastScanCenter) return true;
-
-	const elapsed = now - lastScanAt;
-	if (elapsed >= FOLLOW_ME_MAX_INTERVAL_MS) return true;
-	if (elapsed < FOLLOW_ME_MIN_INTERVAL_MS) return false;
-
-	const moved = rangeDistanceMeters(lastScanCenter.geojson(), center.geojson());
-	return moved > FOLLOW_ME_REFRESH_METERS;
+	return decideScan({
+		now,
+		center: center.internal(),
+		lastScanCenter: lastScanCenter?.internal(),
+		lastScanAt,
+		backoffUntil
+	});
 }
 
 function autoStopReason(now: number): string | undefined {
@@ -195,13 +189,11 @@ async function requestScan(center: Coords): Promise<void> {
 
 	if (data.error || !data.result) {
 		status = "error";
+		backoffUntil = Date.now() + FOLLOW_ME_BACKOFF_MS;
 		return;
 	}
 
 	if (data.result.status === "scanned") {
-		// Only a dispatched scan moves the centre, so a user who was skipped
-		// for coverage or quota is retried on the next tick rather than being
-		// pinned to where they were refused.
 		lastScanCenter = center;
 		lastScanAt = Date.now();
 		scanCount += 1;
@@ -209,7 +201,26 @@ async function requestScan(center: Coords): Promise<void> {
 		return;
 	}
 
-	status = data.result.status;
+	// Every refusal has to change something, or shouldScan() stays true and the
+	// next tick asks again five seconds later - which is what left the menu
+	// flipping between "scanning" and the refusal during beta.
+	if (data.result.status === "covered") {
+		// Nothing here will change until they leave the area, and the whole
+		// point is that this ground is already scanned. Stop rather than idle.
+		stopFollowMe();
+		openToast(m.followme_stopped_covered());
+		return;
+	}
+
+	if (data.result.status === "quota") {
+		stopFollowMe();
+		openToast(m.followme_stopped_quota());
+		return;
+	}
+
+	// Busy is transient, so hold off rather than stopping.
+	status = "busy";
+	backoffUntil = Date.now() + FOLLOW_ME_BACKOFF_MS;
 }
 
 async function tick() {
@@ -268,7 +279,10 @@ function nextTickDelay(): number {
 	const moving = speed === undefined || speed > STATIONARY_SPEED_KMH;
 	if (moving) return TICK_MOVING_MS;
 
-	const dueIn = lastScanAt + FOLLOW_ME_MAX_INTERVAL_MS - Date.now();
+	const dueIn = Math.max(
+		lastScanAt + FOLLOW_ME_MAX_INTERVAL_MS - Date.now(),
+		backoffUntil - Date.now()
+	);
 	return Math.max(dueIn, TICK_MOVING_MS);
 }
 
@@ -284,11 +298,17 @@ async function runTick() {
 }
 
 /**
- * A fix moved the user. Only ever pulls the next check forward, so walking
- * does not turn every incoming fix into a tick.
+ * Every fix feeds the speed estimate - sampling once per tick was far too
+ * coarse, and left a stationary user's speed stuck at whatever it was when
+ * they stopped. Only a fix that moved them pulls the next check forward, so a
+ * standing-still user still sleeps to the five-minute ceiling.
  */
-function onMoved() {
+function onFix(moved: boolean) {
 	if (!active) return;
+
+	recordSpeed();
+	if (!moved) return;
+
 	if (Date.now() + TICK_MOVING_MS < nextWakeAt - 1_000) scheduleTick(TICK_MOVING_MS);
 }
 
@@ -312,11 +332,12 @@ export function startFollowMe() {
 	lastFixTimestamp = undefined;
 	speedSamples = [];
 	speedPaused = false;
+	backoffUntil = 0;
 	scanCount = 0;
 
 	ensureLocationWatch(getMap());
 	document.addEventListener("visibilitychange", onVisibilityChange);
-	unsubscribeLocation = onLocationUpdate(onMoved);
+	unsubscribeLocation = onLocationUpdate(onFix);
 	void runTick();
 }
 
