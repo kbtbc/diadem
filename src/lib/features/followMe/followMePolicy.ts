@@ -11,11 +11,44 @@ import type { LatLon } from "@/lib/utils/coordinates";
  * Above this the feature pauses. Not a staleness limit - a user moving faster
  * than this will not still be in range by the time they have checked the map,
  * switched to the game and thrown a ball, so the scan would be wasted.
+ *
+ * Started at 10 km/h, which is a jog: cyclists and traffic tripped it
+ * constantly. 45 means you are in a vehicle on a road, where the scan really
+ * is wasted, and leaves walking and crawling traffic alone.
  */
-export const FOLLOW_ME_MAX_SPEED_KMH = 10;
+export const FOLLOW_ME_MAX_SPEED_KMH = 45;
 
 /** Resume below this, so a red light or a platform does not end the session. */
-export const FOLLOW_ME_RESUME_SPEED_KMH = 8;
+export const FOLLOW_ME_RESUME_SPEED_KMH = 35;
+
+export type SpeedLimits = {
+	maxKmh: number;
+	resumeKmh: number;
+};
+
+export const DEFAULT_SPEED_LIMITS: SpeedLimits = {
+	maxKmh: FOLLOW_ME_MAX_SPEED_KMH,
+	resumeKmh: FOLLOW_ME_RESUME_SPEED_KMH
+};
+
+/**
+ * Config can only widen the gap, never invert it: a resume threshold at or
+ * above the trip threshold would flap on every fix.
+ */
+export function resolveSpeedLimits(
+	maxKmh: number | undefined,
+	resumeKmh: number | undefined
+): SpeedLimits {
+	const max =
+		Number.isFinite(maxKmh) && (maxKmh as number) > 0
+			? (maxKmh as number)
+			: FOLLOW_ME_MAX_SPEED_KMH;
+	const wanted =
+		Number.isFinite(resumeKmh) && (resumeKmh as number) >= 0
+			? (resumeKmh as number)
+			: Math.round(max * 0.78);
+	return { maxKmh: max, resumeKmh: Math.min(wanted, max) };
+}
 
 /**
  * Rescan once the user has left roughly half the guaranteed-covered footprint
@@ -73,10 +106,14 @@ export function shouldScan(state: ScanState): boolean {
  * stopped the car and sat, no usable fixes arrived, so the estimate never came
  * down and the gate never reopened. No evidence means no reason to block.
  */
-export function speedGateBlocks(speedKmh: number | undefined, paused: boolean): boolean {
+export function speedGateBlocks(
+	speedKmh: number | undefined,
+	paused: boolean,
+	limits: SpeedLimits = DEFAULT_SPEED_LIMITS
+): boolean {
 	if (speedKmh === undefined) return false;
-	if (paused) return speedKmh > FOLLOW_ME_RESUME_SPEED_KMH;
-	return speedKmh > FOLLOW_ME_MAX_SPEED_KMH;
+	if (paused) return speedKmh > limits.resumeKmh;
+	return speedKmh > limits.maxKmh;
 }
 
 /**

@@ -139,6 +139,12 @@ export type ClientConfig = {
 		/** Optional: absent means follow-me stays hidden. */
 		followMe?: boolean;
 	};
+	followMe?: {
+		/** Pause above this ground speed. Default 45. */
+		maxSpeedKmh?: number;
+		/** Resume below this. Default 78% of maxSpeedKmh, so 35. */
+		resumeSpeedKmh?: number;
+	};
 };
 
 export type ServerConfig = {

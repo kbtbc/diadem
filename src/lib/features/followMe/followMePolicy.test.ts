@@ -3,7 +3,10 @@ import { speedFromFixes, type SpeedFix } from "@/lib/utils/fixSpeed";
 import {
 	FOLLOW_ME_MAX_INTERVAL_MS,
 	FOLLOW_ME_MIN_INTERVAL_MS,
+	FOLLOW_ME_MAX_SPEED_KMH,
+	FOLLOW_ME_RESUME_SPEED_KMH,
 	medianSpeedKmh,
+	resolveSpeedLimits,
 	shouldScan,
 	speedGateBlocks,
 	SPEED_SAMPLE_TTL_MS,
@@ -66,12 +69,38 @@ function samples(metersPerSecond: number[]): SpeedSample[] {
 }
 
 describe("follow-me speed gate", () => {
-	it("trips above 10 km/h and only clears below 8", () => {
-		expect(speedGateBlocks(9, false)).toBe(false);
-		expect(speedGateBlocks(11, false)).toBe(true);
-		// latched: 9 km/h is not enough to resume
-		expect(speedGateBlocks(9, true)).toBe(true);
-		expect(speedGateBlocks(7, true)).toBe(false);
+	it("trips above the limit and only clears below the resume threshold", () => {
+		expect(speedGateBlocks(FOLLOW_ME_MAX_SPEED_KMH - 5, false)).toBe(false);
+		expect(speedGateBlocks(FOLLOW_ME_MAX_SPEED_KMH + 5, false)).toBe(true);
+		// latched: still above the resume threshold
+		expect(speedGateBlocks(FOLLOW_ME_RESUME_SPEED_KMH + 5, true)).toBe(true);
+		expect(speedGateBlocks(FOLLOW_ME_RESUME_SPEED_KMH - 5, true)).toBe(false);
+	});
+
+	it("leaves walking and traffic alone at the shipped threshold", () => {
+		// 10 km/h was a jog, and cyclists and crawling traffic tripped it.
+		for (const kmh of [5, 15, 25, 35]) {
+			expect(speedGateBlocks(kmh, false)).toBe(false);
+		}
+		expect(speedGateBlocks(60, false)).toBe(true);
+	});
+
+	it("honours configured limits", () => {
+		const limits = resolveSpeedLimits(20, 15);
+		expect(speedGateBlocks(18, false, limits)).toBe(false);
+		expect(speedGateBlocks(25, false, limits)).toBe(true);
+		expect(speedGateBlocks(18, true, limits)).toBe(true);
+		expect(speedGateBlocks(10, true, limits)).toBe(false);
+	});
+
+	it("falls back, and never lets resume reach the trip threshold", () => {
+		expect(resolveSpeedLimits(undefined, undefined)).toEqual({
+			maxKmh: FOLLOW_ME_MAX_SPEED_KMH,
+			resumeKmh: FOLLOW_ME_RESUME_SPEED_KMH
+		});
+		// a resume at or above the trip threshold would flap on every fix
+		expect(resolveSpeedLimits(30, 99).resumeKmh).toBe(30);
+		expect(resolveSpeedLimits(0, undefined).maxKmh).toBe(FOLLOW_ME_MAX_SPEED_KMH);
 	});
 
 	it("never trips on an unknown speed", () => {
