@@ -42,6 +42,12 @@ export const FOLLOW_ME_SESSION_TIMEOUT_MS = 3 * 60 * 60_000;
  */
 export const FOLLOW_ME_HIDDEN_TIMEOUT_MS = 30 * 60_000;
 
+/** How long the covered-area notice stays up in the Tools menu. */
+export const FOLLOW_ME_NOTICE_MS = 10_000;
+
+/** Long enough to read, for the toasts that explain why it stopped. */
+const TOAST_EXPLAIN_MS = 6_000;
+
 /** Poll rate while the user is on the move. */
 /**
  * Android Chrome discards backgrounded tabs, so switching to the game and back
@@ -88,6 +94,33 @@ let nextWakeAt = 0;
 let backoffUntil = 0;
 let unsubscribeLocation: (() => void) | undefined = undefined;
 let restoreAttempted = false;
+let noticeKind: "covered" | undefined = $state(undefined);
+let noticeTimer: ReturnType<typeof setTimeout> | undefined = undefined;
+
+/**
+ * A reason worth leaving on screen after the feature switched itself off.
+ *
+ * Stopping used to leave the Tools row showing nothing but its usual pitch,
+ * so a user who had just been refused saw no explanation at all.
+ */
+export function getFollowMeNotice() {
+	return noticeKind;
+}
+
+function showCoveredNotice() {
+	noticeKind = "covered";
+	if (noticeTimer) clearTimeout(noticeTimer);
+	noticeTimer = setTimeout(() => {
+		noticeKind = undefined;
+		noticeTimer = undefined;
+	}, FOLLOW_ME_NOTICE_MS);
+}
+
+function clearNotice() {
+	if (noticeTimer) clearTimeout(noticeTimer);
+	noticeTimer = undefined;
+	noticeKind = undefined;
+}
 
 export function getFollowMeActive() {
 	return active;
@@ -276,13 +309,16 @@ async function requestScan(center: Coords): Promise<void> {
 		// Nothing here will change until they leave the area, and the whole
 		// point is that this ground is already scanned. Stop rather than idle.
 		stopFollowMe();
-		openToast(m.followme_stopped_covered());
+		// Both: the toast catches them if the menu is shut, the notice is still
+		// there when they open it to find out what happened.
+		showCoveredNotice();
+		openToast(m.followme_covered_title(), TOAST_EXPLAIN_MS);
 		return;
 	}
 
 	if (data.result.status === "quota") {
 		stopFollowMe();
-		openToast(m.followme_stopped_quota());
+		openToast(m.followme_stopped_quota(), TOAST_EXPLAIN_MS);
 		return;
 	}
 
@@ -300,7 +336,7 @@ async function tick() {
 	const stopReason = autoStopReason(now);
 	if (stopReason) {
 		stopFollowMe();
-		openToast(stopReason);
+		openToast(stopReason, TOAST_EXPLAIN_MS);
 		return;
 	}
 
@@ -468,6 +504,7 @@ export function startFollowMe() {
 	speedPaused = false;
 	backoffUntil = 0;
 	scanCount = 0;
+	clearNotice();
 
 	ensureLocationWatch(getMap());
 	document.addEventListener("visibilitychange", onVisibilityChange);

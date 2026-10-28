@@ -10,7 +10,11 @@ function _openToast(text: string, ms: number) {
 	timeout = setTimeout(() => (isToastOpen = false), ms);
 }
 
-export function openToast(text: string, ms: number = 1500) {
+/**
+ * 1500 ms was not long enough to read a sentence - testers reported toasts
+ * gone before they could see what they said.
+ */
+export function openToast(text: string, ms: number = 3500) {
 	if (isToastOpen) {
 		clearTimeout(timeout);
 		isToastOpen = false;
