@@ -1,4 +1,6 @@
 import type { Feature, Polygon } from "geojson";
+import { getConfig } from "@/lib/services/config/config";
+import { displayAreaName, isAreaHidden } from "@/lib/features/kojiRules";
 import { getHeaders, parseResponse } from "@/lib/utils/requests";
 
 export type KojiReference = {
@@ -28,7 +30,8 @@ export async function loadKojiGeofences() {
 		return;
 	}
 
-	const data = await parseResponse<KojiFeatures>(result);
+	const rules = getConfig()?.coverage;
+	const data = (await parseResponse<KojiFeatures>(result)).filter((a) => !isAreaHidden(a.properties.name, rules));
 
 	const areaMap = new Map<string, KojiFeature>();
 	data.forEach((a) => {
@@ -46,6 +49,11 @@ export async function loadKojiGeofences() {
 		} else {
 			area.properties.parentName = null;
 		}
+	});
+
+	// Display names only, after the parent links above (which use the real names).
+	data.forEach((area) => {
+		area.properties.name = displayAreaName(area.properties.name, rules);
 	});
 
 	geofences = data;

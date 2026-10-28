@@ -126,6 +126,7 @@ type StaticMap = {
 };
 
 export type ClientConfig = {
+	coverage?: import("@/lib/features/kojiRules").CoverageRules;
 	mapStyles: MapStyle[];
 	uiconSets: UiconSet[];
 	general: General;
