@@ -6,7 +6,9 @@ import {
 	medianSpeedKmh,
 	shouldScan,
 	speedGateBlocks,
-	type ScanState
+	SPEED_SAMPLE_TTL_MS,
+	type ScanState,
+	type SpeedSample
 } from "./followMePolicy";
 
 const HERE = { lat: 39.2, lon: -76.7 };
@@ -58,6 +60,11 @@ describe("follow-me scan decision", () => {
 	});
 });
 
+/** Samples all taken now, oldest first. */
+function samples(metersPerSecond: number[]): SpeedSample[] {
+	return metersPerSecond.map((speed) => ({ metersPerSecond: speed, at: NOW }));
+}
+
 describe("follow-me speed gate", () => {
 	it("trips above 10 km/h and only clears below 8", () => {
 		expect(speedGateBlocks(9, false)).toBe(false);
@@ -72,20 +79,41 @@ describe("follow-me speed gate", () => {
 	});
 
 	it("takes the median, so one wild fix cannot trip it", () => {
-		expect(medianSpeedKmh([1, 1.1, 30, 1.2, 1])!).toBeLessThan(10);
+		expect(medianSpeedKmh(samples([1, 1.1, 30, 1.2, 1]), NOW)!).toBeLessThan(10);
 	});
 
 	it("will not call a speed on too few samples", () => {
 		// A single stale fix left over from driving used to re-trip the gate
 		// the instant the feature was switched back on, standing still.
-		expect(medianSpeedKmh([25])).toBeUndefined();
-		expect(medianSpeedKmh([25, 25])).toBeUndefined();
-		expect(medianSpeedKmh([25, 25, 25])).toBeGreaterThan(10);
+		expect(medianSpeedKmh(samples([25]), NOW)).toBeUndefined();
+		expect(medianSpeedKmh(samples([25, 25]), NOW)).toBeUndefined();
+		expect(medianSpeedKmh(samples([25, 25, 25]), NOW)).toBeGreaterThan(10);
 	});
 
-	it("leaves a paused session paused while the speed is unknown", () => {
-		expect(speedGateBlocks(undefined, true)).toBe(true);
+	it("forgets samples once they expire", () => {
+		// The stuck pause: he stopped the car and sat, no usable fixes came in,
+		// and the estimate stayed at motorway speed indefinitely.
+		const driving = samples([25, 25, 25]);
+		expect(medianSpeedKmh(driving, NOW)).toBeGreaterThan(10);
+		expect(medianSpeedKmh(driving, NOW + SPEED_SAMPLE_TTL_MS + 1)).toBeUndefined();
+	});
+
+	it("releases the latch when the speed is unknown", () => {
+		// Holding someone paused on evidence that has expired is the bug; with
+		// nothing to go on there is no reason to block.
+		expect(speedGateBlocks(undefined, true)).toBe(false);
 		expect(speedGateBlocks(undefined, false)).toBe(false);
+	});
+
+	it("comes off pause once stale driving samples age out", () => {
+		const driving = samples([25, 25, 25]);
+		let paused = speedGateBlocks(medianSpeedKmh(driving, NOW), false);
+		expect(paused).toBe(true);
+
+		// Sat still, nothing new arrived, the old samples expired.
+		const later = NOW + SPEED_SAMPLE_TTL_MS + 1;
+		paused = speedGateBlocks(medianSpeedKmh(driving, later), paused);
+		expect(paused).toBe(false);
 	});
 });
 

@@ -67,11 +67,14 @@ export function shouldScan(state: ScanState): boolean {
 /**
  * The speed gate, latched so it has hysteresis: it trips above
  * FOLLOW_ME_MAX_SPEED_KMH and only clears below FOLLOW_ME_RESUME_SPEED_KMH.
- * An unknown speed never trips it - a device that will not report speed should
- * still get scans.
+ *
+ * An unknown speed releases the latch rather than holding it. Keeping someone
+ * paused on evidence that has expired is how a tester ended up stuck: he
+ * stopped the car and sat, no usable fixes arrived, so the estimate never came
+ * down and the gate never reopened. No evidence means no reason to block.
  */
 export function speedGateBlocks(speedKmh: number | undefined, paused: boolean): boolean {
-	if (speedKmh === undefined) return paused;
+	if (speedKmh === undefined) return false;
 	if (paused) return speedKmh > FOLLOW_ME_RESUME_SPEED_KMH;
 	return speedKmh > FOLLOW_ME_MAX_SPEED_KMH;
 }
@@ -85,9 +88,25 @@ export function speedGateBlocks(speedKmh: number | undefined, paused: boolean): 
  */
 export const MIN_SPEED_SAMPLES = 3;
 
+/**
+ * Samples older than this are no evidence of how fast anyone is going now.
+ *
+ * Without an expiry the last few fixes before the phone stopped reporting -
+ * backgrounded, indoors, accuracy gone - stayed the whole estimate forever.
+ */
+export const SPEED_SAMPLE_TTL_MS = 60_000;
+
+export type SpeedSample = {
+	metersPerSecond: number;
+	/** Epoch milliseconds the sample was taken. */
+	at: number;
+};
+
 /** Median rejects a spike better than a mean, which one bad fix can carry. */
-export function medianSpeedKmh(samplesMetersPerSecond: number[]): number | undefined {
-	if (samplesMetersPerSecond.length < MIN_SPEED_SAMPLES) return undefined;
-	const sorted = [...samplesMetersPerSecond].sort((a, b) => a - b);
+export function medianSpeedKmh(samples: SpeedSample[], now: number): number | undefined {
+	const fresh = samples.filter((sample) => now - sample.at <= SPEED_SAMPLE_TTL_MS);
+	if (fresh.length < MIN_SPEED_SAMPLES) return undefined;
+
+	const sorted = fresh.map((sample) => sample.metersPerSecond).sort((a, b) => a - b);
 	return (sorted[Math.floor(sorted.length / 2)] * 3600) / 1000;
 }

@@ -12,7 +12,8 @@ import {
 	FOLLOW_ME_MAX_INTERVAL_MS,
 	medianSpeedKmh,
 	shouldScan as decideScan,
-	speedGateBlocks as decideSpeedGate
+	speedGateBlocks as decideSpeedGate,
+	type SpeedSample
 } from "./followMePolicy";
 
 export {
@@ -58,7 +59,7 @@ let startedAt = 0;
 let lastScanCenter: Coords | undefined = undefined;
 let hiddenSince: number | undefined = undefined;
 let lastFixTimestamp: number | undefined = undefined;
-let speedSamples: number[] = [];
+let speedSamples: SpeedSample[] = [];
 let speedPaused = false;
 let inFlight = false;
 let timer: ReturnType<typeof setTimeout> | undefined = undefined;
@@ -162,7 +163,7 @@ export function getFollowMeChipLabel(): string {
  * a single bad fix shows up as one large spike.
  */
 export function getFollowMeSpeedKmh(): number | undefined {
-	return medianSpeedKmh(speedSamples);
+	return medianSpeedKmh(speedSamples, Date.now());
 }
 
 function recordSpeed() {
@@ -175,7 +176,7 @@ function recordSpeed() {
 	if (Date.now() - location.timestamp > FIX_STALENESS_MS) return;
 
 	lastFixTimestamp = location.timestamp;
-	speedSamples.push(location.speed);
+	speedSamples.push({ metersPerSecond: location.speed, at: Date.now() });
 	if (speedSamples.length > SPEED_SAMPLES) speedSamples.shift();
 }
 
@@ -228,11 +229,7 @@ async function requestScan(center: Coords): Promise<void> {
 		scanCount += 1;
 		status = "idle";
 
-		// Only the first: the chip's counter shows the rest, and a toast every
-		// five minutes would wear out its welcome.
-		if (scanCount === 1) {
-			openToast(m.followme_toast_scanned({ count: data.result.locations ?? 0 }));
-		}
+		openToast(m.followme_toast_scanned({ count: data.result.locations ?? 0 }));
 		return;
 	}
 
