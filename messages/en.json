@@ -1062,5 +1062,12 @@
 	"followme_stopped_covered": "Follow me turned off: you're inside an area we already scan",
 	"followme_stopped_quota": "Follow me turned off: hourly scan limit reached",
 	"followme_chip_stop": "Tap to stop following",
-	"followme_toast_scanned": "Scanning {count} points around you"
+	"followme_toast_scanned": "Scanning {count} points around you",
+	"followme_chip_following": "Following",
+	"followme_chip_scanning": "Scanning",
+	"followme_chip_paused": "Paused",
+	"followme_chip_locating": "Locating",
+	"followme_chip_waiting": "Waiting",
+	"followme_chip_error": "Error",
+	"followme_scan_one": "1 scan"
 }

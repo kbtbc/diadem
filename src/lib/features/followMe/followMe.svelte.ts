@@ -121,10 +121,39 @@ export function getFollowMeSummary(): string {
 	}
 
 	if (scanCount > 0 && (status === "idle" || status === "scanning")) {
-		return statusMessage() + " \u00b7 " + m.followme_scans({ count: scanCount });
+		return statusMessage() + " \u00b7 " + scanCountLabel();
 	}
 
 	return statusMessage();
+}
+
+/** Paraglide has no plural form here, so pick the wording in code. */
+function scanCountLabel(): string {
+	return scanCount === 1 ? m.followme_scan_one() : m.followme_scans({ count: scanCount });
+}
+
+/**
+ * One word for the map chip.
+ *
+ * The chip sits over the map and competes with it for attention, so it says
+ * only what state the feature is in; the Tools row carries the speed and the
+ * scan count for anyone who wants them.
+ */
+export function getFollowMeChipLabel(): string {
+	switch (status) {
+		case "locating":
+			return m.followme_chip_locating();
+		case "scanning":
+			return m.followme_chip_scanning();
+		case "too-fast":
+			return m.followme_chip_paused();
+		case "busy":
+			return m.followme_chip_waiting();
+		case "error":
+			return m.followme_chip_error();
+		default:
+			return m.followme_chip_following();
+	}
 }
 
 /**
