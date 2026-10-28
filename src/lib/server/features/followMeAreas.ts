@@ -9,10 +9,15 @@ const log = getLogger("followme");
 
 const CACHE_MS = 5 * 60_000;
 
-let cache: { at: number; polygons: Feature<Polygon>[] } | undefined = undefined;
+type CoveredArea = { name: string; geofence: Feature<Polygon> };
+
+/** Which area a scan ran into, so the refusal can name it. */
+export type CoverageVerdict = { covered: false } | { covered: true; area: string };
+
+let cache: { at: number; areas: CoveredArea[] } | undefined = undefined;
 
 /**
- * The areas we already scan for pokemon, as polygons.
+ * The areas we already scan for pokemon, with their geofences.
  *
  * Both the list and the geofences come from Dragonite's own area store, so
  * there is nothing to match up by name. This used to cross Dragonite's
@@ -21,26 +26,31 @@ let cache: { at: number; polygons: Feature<Polygon>[] } | undefined = undefined;
  * the area table in both directions, and it says nothing about which mode an
  * area runs, which meant keeping a hand-written list of the fort-only ones.
  */
-async function getCoveredPolygons(): Promise<Feature<Polygon>[] | undefined> {
-	if (cache && Date.now() - cache.at < CACHE_MS) return cache.polygons;
+async function getCoveredAreas(): Promise<CoveredArea[] | undefined> {
+	if (cache && Date.now() - cache.at < CACHE_MS) return cache.areas;
 
-	const areas = await getDragoniteAreas();
-	if (!areas) return undefined;
+	const all = await getDragoniteAreas();
+	if (!all) return undefined;
 
 	// The same three conditions the area table uses for "this ground is
 	// covered for pokemon": enabled, pokemon mode on, and workers on it.
-	const polygons = areas
-		.filter((area) => area.enabled && area.enablePokemon && area.pokemonWorkers > 0)
-		.map((area) => area.geofence)
-		.filter((geofence): geofence is Feature<Polygon> => Boolean(geofence));
+	const areas: CoveredArea[] = [];
+	for (const area of all) {
+		if (!area.enabled || !area.enablePokemon || area.pokemonWorkers <= 0) continue;
+		if (!area.geofence) continue;
+		areas.push({ name: area.name, geofence: area.geofence });
+	}
 
-	log.debug("Follow-me coverage: %d covered areas of %d", polygons.length, areas.length);
-	cache = { at: Date.now(), polygons };
-	return polygons;
+	log.debug("Follow-me coverage: %d covered areas of %d", areas.length, all.length);
+	cache = { at: Date.now(), areas };
+	return areas;
 }
 
 /**
- * Whether a follow-me scan would overlap ground we already cover.
+ * Whether a follow-me scan would overlap ground we already cover, and which
+ * area it ran into - the caller logs that name, because "refused 40 times" and
+ * "refused 40 times by one area whose geofence reaches too far" are different
+ * problems.
  *
  * Returns undefined when coverage cannot be determined - the caller backs off
  * rather than guessing, because guessing wrong spends 49 scouts.
@@ -50,21 +60,23 @@ async function getCoveredPolygons(): Promise<Feature<Polygon>[] | undefined> {
  * when the user themselves stands inside one, which scans the fringes of our
  * areas at the cost of some duplicated points.
  */
-export async function overlapsCoveredArea(points: Coords[]): Promise<boolean | undefined> {
-	const polygons = await getCoveredPolygons();
-	if (!polygons) return undefined;
+export async function overlapsCoveredArea(points: Coords[]): Promise<CoverageVerdict | undefined> {
+	const areas = await getCoveredAreas();
+	if (!areas) return undefined;
 
 	const mode = getServerConfig().followMe?.overlapMode ?? "overlap";
 	const tested = mode === "center" ? points.slice(0, 1) : points;
 
 	for (const point of tested) {
 		const position = point.geojson();
-		for (const polygon of polygons) {
-			if (booleanPointInPolygon(position, polygon)) return true;
+		for (const area of areas) {
+			if (booleanPointInPolygon(position, area.geofence)) {
+				return { covered: true, area: area.name };
+			}
 		}
 	}
 
-	return false;
+	return { covered: false };
 }
 
 /** Test seam: drop the cached coverage set. */

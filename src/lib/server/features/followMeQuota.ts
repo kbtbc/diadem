@@ -69,10 +69,8 @@ export function reserveFollowerSlot(userKey: string): boolean {
 	const now = Date.now();
 	pruneFollowers(now);
 
-	if (!followers.has(userKey) && followers.size >= maxFollowers) {
-		log.info("Follow-me at capacity: %d followers", followers.size);
-		return false;
-	}
+	// The refusal is logged by the caller, which knows whose it is.
+	if (!followers.has(userKey) && followers.size >= maxFollowers) return false;
 
 	followers.set(userKey, now);
 	return true;
@@ -87,18 +85,15 @@ export function getFollowerCount(): number {
 	return followers.size;
 }
 
-/** True when the scout queue is too deep, or unreadable, to add 49 more points. */
-export async function scoutQueueIsBusy(): Promise<boolean> {
+/**
+ * Whether the scout queue is too deep, or unreadable, to add 49 more points.
+ * The depth comes back with the answer so the caller can log one line saying
+ * both who was refused and how deep the queue was.
+ */
+export async function scoutQueueIsBusy(): Promise<{ busy: boolean; queue: number | undefined }> {
 	const queue = await getScoutQueue();
-	if (queue === undefined) {
-		log.error("Follow-me backing off: scout queue depth unreadable");
-		return true;
-	}
-	if (queue > queueLimit) {
-		log.info("Follow-me backing off: scout queue at %d", queue);
-		return true;
-	}
-	return false;
+	if (queue === undefined) return { busy: true, queue: undefined };
+	return { busy: queue > queueLimit, queue };
 }
 
 export async function consumeFollowMeQuota(
