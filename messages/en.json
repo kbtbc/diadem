@@ -1085,7 +1085,7 @@
 	"followme_info_none": "none yet",
 	"followme_info_on_move": "when you move",
 	"followme_info_stop": "Stop following",
-	"followme_alerts_toggle": "Move my Discord alerts with me",
+	"followme_alerts_toggle": "Sync Discord Alerts",
 	"followme_info_scans_used": "Scans used",
 	"followme_info_of": "{used} of {limit}"
 }
