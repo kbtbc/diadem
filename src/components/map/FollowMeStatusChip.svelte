@@ -8,7 +8,8 @@
 		getFollowMeSnapshot,
 		getFollowMeStatus,
 		recenterFollowMe,
-		restoreFollowMe
+		restoreFollowMe,
+		stopFollowMe
 	} from "@/lib/features/followMe/followMe.svelte.js";
 	import { getIsCameraFollowing } from "@/lib/map/geolocate.svelte";
 	import { onMount } from "svelte";
@@ -27,18 +28,32 @@
 	let detached = $derived(getFollowMeActive() && !getIsCameraFollowing());
 
 	// Taken when the panel opens and never touched again: no timer runs over the
-	// map. Tapping the chip is also no longer how you switch the feature off -
-	// that was a tap meaning two different things on invisible state, and it
-	// caught the tester out. Off lives in the Tools menu.
+	// map. Tapping the chip is not how you switch the feature off - that was a
+	// tap meaning two different things on invisible state, and it caught the
+	// tester out. Off is the button at the bottom of this panel, where it takes
+	// a deliberate second tap, and in the Tools menu.
 	let info: ReturnType<typeof getFollowMeSnapshot> | undefined = $state(undefined);
 
-	function toggleInfo() {
+	// A chip reading "Recenter" is a button that says what it does, so it had
+	// better do it: opening a panel instead read as broken. The panel is one
+	// more tap away, which is the right way round - a dropped camera is the
+	// thing you want to fix in that moment.
+	function onChipTap() {
+		if (detached) {
+			recenter();
+			return;
+		}
 		info = info ? undefined : getFollowMeSnapshot();
 	}
 
 	function recenter() {
 		recenterFollowMe();
 		info = undefined;
+	}
+
+	function stop() {
+		info = undefined;
+		stopFollowMe();
 	}
 
 	/** The row labels carry the direction, so one "N min" string does both. */
@@ -49,10 +64,20 @@
 		return m.followme_info_minutes({ count: Math.round(seconds / 60) });
 	}
 
-	function untilLabel(at: number, now: number): string {
-		if (!at || at <= now) return m.followme_info_due();
-		const minutes = Math.round((at - now) / 60_000);
-		return minutes < 1 ? m.followme_info_due() : m.followme_info_minutes({ count: minutes });
+	/**
+	 * Rounded up, so the last 59 seconds of a cooldown read "1 min" rather than
+	 * "due now" - a scan that cannot run yet should not claim to be due.
+	 *
+	 * Once the cooldown has passed there is no time to count down to: the scan
+	 * waits on the user covering ground, so that is what it says. The
+	 * five-minute ceiling will fire it eventually if they stay put, but
+	 * movement is the part they control.
+	 */
+	function untilLabel(info: ReturnType<typeof getFollowMeSnapshot>): string {
+		if (info.nextScanAt > info.now) {
+			return m.followme_info_minutes({ count: Math.ceil((info.nextScanAt - info.now) / 60_000) });
+		}
+		return info.lastScanAt ? m.followme_info_on_move() : m.followme_info_due();
 	}
 
 	// This chip is mounted with the map whether or not follow-me is running, so
@@ -67,8 +92,8 @@
 			variant="ghost"
 			size=""
 			class="pointer-events-auto px-3 py-2 text-sm bg-card border rounded-lg shadow-lg hover:bg-accent hover:text-accent-foreground active:bg-accent active:text-accent-foreground"
-			onclick={toggleInfo}
-			title={m.followme_chip_info_title()}
+			onclick={onChipTap}
+			title={detached ? m.followme_chip_recenter_title() : m.followme_chip_info_title()}
 		>
 			<IconValue
 				Icon={scanning ? LoaderCircle : detached ? Locate : paused ? LocateOff : LocateFixed}
@@ -91,7 +116,7 @@
 				</div>
 				<div class="flex justify-between gap-6">
 					<span class="text-muted-foreground">{m.followme_info_next_scan()}</span>
-					<span class="whitespace-nowrap">{untilLabel(info.nextScanAt, info.now)}</span>
+					<span class="whitespace-nowrap">{untilLabel(info)}</span>
 				</div>
 				<div class="flex justify-between gap-6">
 					<span class="text-muted-foreground">{m.followme_info_scans()}</span>
@@ -109,6 +134,14 @@
 						{m.followme_chip_recenter()}
 					</Button>
 				{/if}
+				<Button
+					variant="ghost"
+					size=""
+					class="mt-1 w-full px-2 py-1 text-xs border rounded-md text-destructive hover:bg-accent"
+					onclick={stop}
+				>
+					{m.followme_info_stop()}
+				</Button>
 			</div>
 		{/if}
 	</div>
