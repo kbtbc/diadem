@@ -26,8 +26,16 @@ let animationFrame: number | undefined = undefined;
 let shouldUpdateLocation = false;
 let shouldUpdateCamera = false;
 let previousFix: SpeedFix | undefined = undefined;
-let cameraFollowMap: maplibre.Map | undefined = undefined;
 let watchPinned = false;
+let dragFrom: maplibre.LngLat | undefined = undefined;
+
+/**
+ * How far a drag has to carry the map before it counts as "I want to look over
+ * there" rather than a thumb brushing the screen. A phone in a car mount picks
+ * up small drags all the time, and detaching on any of them left the camera
+ * silently unhooked until the chip was tapped.
+ */
+const detachDragPixels = 60;
 
 const minZoom = 14.5;
 const maxZoom = 17.5;
@@ -73,9 +81,15 @@ export function setIsLocateFollowing(state: boolean) {
 	isLocateFollowing = state;
 }
 
-/** Whether the camera is currently chasing the user. */
+/**
+ * Whether the camera is actually chasing the user.
+ *
+ * Both flags, because panning needs both. Reporting only isLocateFollowing is
+ * what let the chip say "Following" through a whole drive while the camera sat
+ * still: shouldUpdateCamera was false, so the panTo never ran.
+ */
 export function getIsCameraFollowing() {
-	return isLocateFollowing;
+	return isLocateFollowing && shouldUpdateCamera;
 }
 
 /**
@@ -102,20 +116,47 @@ export function pinLocationWatch(pinned: boolean) {
 export function startCameraFollow(map: maplibre.Map | undefined) {
 	isLocateFollowing = true;
 
-	if (map && map !== cameraFollowMap) {
-		cameraFollowMap?.off("dragstart", stopCameraFollow);
-		map.on("dragstart", stopCameraFollow);
-		cameraFollowMap = map;
-	}
+	// Set here rather than waiting for flyToLocation to report back. The old
+	// moveend handshake could never complete - see flyToLocation - and until it
+	// did, every fix skipped the panTo.
+	shouldUpdateCamera = true;
 
 	// With no fix yet there is nothing to fly to: the first one takes itself
 	// there, because the camera is following by then.
 	if (map && currentLocation) flyToLocation(map, currentLocation);
 }
 
+/**
+ * The map's own drag events, routed through here so that one rule decides
+ * whether a drag meant "stop following me".
+ *
+ * It used to be decided in two places at once. events.ts cleared the follow
+ * flag on every dragstart with no threshold and no questions asked, which is
+ * fine for someone panning at a desk and useless in a moving car: a thumb
+ * brushing the screen, or inertia on a bump, silently unhooked the camera and
+ * only a chip tap brought it back.
+ */
+export function noteMapDragStart() {
+	dragFrom = getMap()?.getCenter();
+}
+
+export function noteMapDragEnd() {
+	const map = getMap();
+	const from = dragFrom;
+	dragFrom = undefined;
+	if (!map || !from) return;
+
+	const start = map.project(from);
+	const end = map.project(map.getCenter());
+	if (Math.hypot(start.x - end.x, start.y - end.y) >= detachDragPixels) {
+		stopCameraFollow();
+	}
+}
+
 export function stopCameraFollow() {
 	isLocateFollowing = false;
 	shouldUpdateCamera = false;
+	dragFrom = undefined;
 }
 
 export function resetLocate() {
@@ -199,11 +240,14 @@ function flyToLocation(map: maplibre.Map, location: Location) {
 		zoom = maxZoom;
 	}
 
-	map.once("moveend", (event) => {
-		if ((event as typeof event & { data?: string }).data === "locate") {
-			shouldUpdateCamera = true;
-		}
-	});
+	// This used to wait for a moveend tagged "locate" before letting fixes pan
+	// the camera. A once() handler is spent by whichever moveend arrives first,
+	// so any unrelated camera movement finishing ahead of the flyTo consumed it
+	// and nothing ever set the flag again; a flyTo to where the map already sits
+	// may not fire moveend at all. Either way the camera never followed. The
+	// handshake only ever bought not being nudged mid-flight by an incoming fix,
+	// which is invisible when both are heading to the same place.
+	shouldUpdateCamera = true;
 	map.flyTo(
 		{
 			center: [location.lng, location.lat],
@@ -372,16 +416,15 @@ export function ensureLocationWatch(map: maplibre.Map | undefined) {
 
 export function updateLocation(map: maplibre.Map | undefined, allowFollow: boolean) {
 	if (allowFollow && watchId !== undefined) {
-		if (isLocateFollowing) {
+		// A lock: tap to have the map follow you, tap again to stop. Asking
+		// getIsCameraFollowing rather than the raw flag means a tap after a pan
+		// re-engages the camera instead of tearing the whole watch down.
+		if (getIsCameraFollowing()) {
 			resetLocate();
 			return;
 		}
 
-		isLocateFollowing = true;
-
-		if (currentLocation && map) {
-			flyToLocation(map, currentLocation);
-		}
+		startCameraFollow(map);
 		return;
 	}
 

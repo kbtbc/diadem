@@ -23,6 +23,7 @@
 	} from "$lib/map/locationEvents";
 	import { clearLoadMapObjectsInterval } from "@/lib/map/loadMapObjects";
 	import {
+		onMapDragEnd,
 		onMapDragStart,
 		onMapMoveEnd,
 		onMapMoveStart,
@@ -84,6 +85,7 @@
 		map.on("touchmove", clearPressTimer);
 		map.on("touchcancel", onMapTouchEnd);
 		map.on("dragstart", onMapDragStart);
+		map.on("dragend", onMapDragEnd);
 		map.on("movestart", onMapMoveStart);
 
 		// tick so feature handler registers first

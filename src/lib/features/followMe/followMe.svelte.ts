@@ -109,6 +109,7 @@ let speedPaused = false;
 let inFlight = false;
 let timer: ReturnType<typeof setTimeout> | undefined = undefined;
 let nextWakeAt = 0;
+let lastScanPoints = 0;
 let backoffUntil = 0;
 let unsubscribeLocation: (() => void) | undefined = undefined;
 let restoreAttempted = false;
@@ -214,6 +215,23 @@ function scanCountLabel(): string {
  * only what state the feature is in; the Tools row carries the speed and the
  * scan count for anyone who wants them.
  */
+/**
+ * A one-shot reading for the chip's info panel, taken when it opens.
+ *
+ * Deliberately not reactive, and deliberately not a clock: a countdown
+ * re-rendering over the map every second is a cost this page cannot spare, and
+ * these numbers are only interesting at the moment you ask for them.
+ */
+export function getFollowMeSnapshot() {
+	return {
+		now: Date.now(),
+		scanCount,
+		lastScanAt,
+		nextScanAt: nextWakeAt,
+		points: lastScanPoints
+	};
+}
+
 export function getFollowMeChipLabel(): string {
 	switch (status) {
 		case "locating":
@@ -372,8 +390,11 @@ async function requestScan(center: Coords): Promise<void> {
 		// Status stays "scanning" until the queue has actually worked through
 		// it - queueing is instant, the scan is not, and a tester could not tell
 		// whether a scan with no visible spawns had finished or failed.
+		//
+		// No toast at the start any more: the chip spins for exactly as long as
+		// the scan takes, which says the same thing without covering the map.
 		const points = data.result.locations ?? 0;
-		openToast(m.followme_toast_scanned({ count: points }));
+		lastScanPoints = points;
 		watchScanCompletion(points);
 		return;
 	}

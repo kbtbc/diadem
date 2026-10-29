@@ -13,20 +13,26 @@ import type { LatLon } from "@/lib/utils/coordinates";
  * switched to the game and thrown a ball, so the scan would be wasted.
  *
  * Started at 10 km/h, which is a jog: cyclists and traffic tripped it
- * constantly. Then 45, which turned out to be ordinary town driving - a
- * tester spent a whole drive home latched. 60 is a road speed you genuinely
- * cannot act on a scan at, and leaves town traffic alone.
+ * constantly. Then 45, which was ordinary town driving - a tester spent a
+ * whole drive home latched. Then 60, which still caught him on residential
+ * streets where he wanted to see what was around him. 90 is highway speed.
+ *
+ * The gate is no longer what protects the scout pool: the 90-second floor, the
+ * hourly quota and the daily location allowance do that. It only stops scans
+ * nobody could act on, so it belongs at the top of the range rather than in
+ * the middle of it.
  */
-export const FOLLOW_ME_MAX_SPEED_KMH = 60;
+export const FOLLOW_ME_MAX_SPEED_KMH = 90;
 
 /**
  * Resume below this, so a red light or a platform does not end the session.
  *
  * 35 was 22 mph, which sits inside the band a car spends most of its time in
- * around town, so the gate stayed latched for a whole trip. 40 reopens at
- * town speed.
+ * around town, so the gate stayed latched for a whole trip. 60 reopens as soon
+ * as you are off the highway, and keeps the same 30 km/h gap below the trip
+ * threshold that stopped it flapping.
  */
-export const FOLLOW_ME_RESUME_SPEED_KMH = 40;
+export const FOLLOW_ME_RESUME_SPEED_KMH = 60;
 
 export type SpeedLimits = {
 	maxKmh: number;

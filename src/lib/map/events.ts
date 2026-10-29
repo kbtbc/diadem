@@ -1,5 +1,5 @@
 import { updateFeatures } from "@/lib/map/featuresGen.svelte";
-import { setIsLocateFollowing } from "@/lib/map/geolocate.svelte";
+import { noteMapDragEnd, noteMapDragStart } from "@/lib/map/geolocate.svelte";
 import { clearLoadMapObjectsInterval, resetLoadMapObjects } from "@/lib/map/loadMapObjects";
 import { addMapStyleVersion, getMap } from "@/lib/map/map.svelte";
 import {
@@ -52,7 +52,11 @@ export async function onMapMoveStart() {
 }
 
 export function onMapDragStart() {
-	setIsLocateFollowing(false);
+	noteMapDragStart();
+}
+
+export function onMapDragEnd() {
+	noteMapDragEnd();
 }
 
 export function onWindowFocus() {
