@@ -1083,5 +1083,7 @@
 	"followme_info_minutes": "{count} min",
 	"followme_info_just_now": "just now",
 	"followme_info_due": "due now",
-	"followme_info_none": "none yet"
+	"followme_info_none": "none yet",
+	"followme_info_on_move": "when you move",
+	"followme_info_stop": "Stop following"
 }

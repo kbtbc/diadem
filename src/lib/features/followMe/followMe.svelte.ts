@@ -223,11 +223,21 @@ function scanCountLabel(): string {
  * these numbers are only interesting at the moment you ask for them.
  */
 export function getFollowMeSnapshot() {
+	// nextWakeAt used to go in nextScanAt, and it is the poll timer - five
+	// seconds while the user is moving. So the panel read "next scan due now"
+	// every time it was opened on the move, including in the same breath as
+	// "last scan just now". What a user means by "next scan" is the earliest a
+	// scan can actually run: the cooldown since the last one, or the backoff if
+	// the scouts turned us away.
+	const cooldownEndsAt = lastScanAt
+		? lastScanAt + resolveMinInterval(getConfig()?.followMe?.minScanIntervalSeconds)
+		: 0;
+
 	return {
 		now: Date.now(),
 		scanCount,
 		lastScanAt,
-		nextScanAt: nextWakeAt,
+		nextScanAt: Math.max(cooldownEndsAt, backoffUntil),
 		points: lastScanPoints
 	};
 }
