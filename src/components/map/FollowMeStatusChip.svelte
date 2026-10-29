@@ -40,15 +40,11 @@
 	// thing you want to fix in that moment.
 	function onChipTap() {
 		if (detached) {
-			recenter();
+			recenterFollowMe();
+			info = undefined;
 			return;
 		}
 		info = info ? undefined : getFollowMeSnapshot();
-	}
-
-	function recenter() {
-		recenterFollowMe();
-		info = undefined;
 	}
 
 	function stop() {
@@ -132,16 +128,12 @@
 							: info.scanCount}
 					</span>
 				</div>
-				{#if detached}
-					<Button
-						variant="ghost"
-						size=""
-						class="mt-1 w-full px-2 py-1 text-xs border rounded-md hover:bg-accent"
-						onclick={recenter}
-					>
-						{m.followme_chip_recenter()}
-					</Button>
-				{/if}
+				<!--
+					No Recenter here any more. Since the chip recenters when it says
+					Recenter, this one could only ever appear by panning with the panel
+					already open - and then the screen carried two buttons with the same
+					word on them, one above the other.
+				-->
 				<Button
 					variant="ghost"
 					size=""

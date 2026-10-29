@@ -88,6 +88,11 @@ type FollowMeRequest = {
 	lon?: number;
 	/** Set when the client is switching the feature off. */
 	stop?: boolean;
+	/**
+	 * Move the user's alerts and nothing else, for when the speed gate is
+	 * holding scans back. Costs no quota and no scout time.
+	 */
+	alertsOnly?: boolean;
 };
 
 export async function POST({ request, locals }) {
@@ -131,6 +136,17 @@ export async function POST({ request, locals }) {
 			// Switched off part-way through a session.
 			void stopAlertFollow(userKey);
 		}
+	}
+
+	if (body.alertsOnly) {
+		// No follower slot, no coverage check, no quota: this asks for nothing
+		// from the scout pool. It also never starts a session - a session begins
+		// with a scan, and somebody who has been above the gate since they
+		// switched the feature on has not had one yet.
+		if (isAlertFollowEnabled() && wantsAlertsMoved(locals.user)) {
+			void moveAlerts(userKey, lat, lon);
+		}
+		return respond(request, result({ status: "paused" }));
 	}
 
 	if (!reserveFollowerSlot(userKey)) {

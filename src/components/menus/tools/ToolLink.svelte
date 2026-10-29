@@ -60,7 +60,12 @@
 			<div class="flex items-center gap-2 w-full font-semibold">
 				<span>{title}</span>
 			</div>
-			<p class="text-muted-foreground text-wrap text-left">
+			<!--
+				Smaller than the title on purpose. The row inherits text-lg on mobile,
+				and at that size a line like "Scan around you as you move" wraps onto
+				a second line and makes every box in the menu taller.
+			-->
+			<p class="text-muted-foreground text-sm text-wrap text-left">
 				{description}
 			</p>
 		</div>
