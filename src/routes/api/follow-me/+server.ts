@@ -5,6 +5,7 @@ import { respond } from "@/lib/server/api/respond";
 import { result } from "@/lib/server/api/results";
 import { hasFeatureAnywhereServer } from "@/lib/server/auth/checkIfAuthed";
 import { overlapsCoveredArea } from "@/lib/server/features/followMeAreas";
+import { chargeDailyLocations, refundDailyLocations } from "@/lib/server/features/scoutBudget";
 import {
 	consumeFollowMeQuota,
 	getFollowerCount,
@@ -119,6 +120,19 @@ export async function POST({ request, locals }) {
 		return respond(request, result({ status: "quota" }));
 	}
 
+	// The day's allowance is shared with the manual scout tool, and is in the
+	// database rather than in memory so a deploy cannot wipe it.
+	const daily = await chargeDailyLocations(userKey, points.length);
+	if (!daily.ok) {
+		await refundFollowMeQuota(userKey);
+		logRefusal(userKey, daily.reason, "spent: " + daily.spent + " of " + daily.limit);
+
+		// A database that would not answer is a transient fault, not a spent
+		// allowance: back off instead of ending the session.
+		if (daily.reason === "unavailable") return respond(request, result({ status: "busy" }));
+		return respond(request, result({ status: "quota", daily: true }));
+	}
+
 	const username = "Diadem FM: " + (locals.user?.name || "<unknown user>");
 	const success = await addScoutEntries(
 		username,
@@ -127,8 +141,9 @@ export async function POST({ request, locals }) {
 
 	if (!success) {
 		await refundFollowMeQuota(userKey);
+		await refundDailyLocations(userKey, points.length);
 		log.error(
-			"Follow-me scan failed to queue / user: %s / locations: %d / quota point refunded",
+			"Follow-me scan failed to queue / user: %s / locations: %d / quota and allowance refunded",
 			userKey,
 			points.length
 		);
@@ -136,11 +151,13 @@ export async function POST({ request, locals }) {
 	}
 
 	log.info(
-		"Follow-me scan queued / user: %s / locations: %d / quota left: %d / followers: %d",
+		"Follow-me scan queued / user: %s / locations: %d / quota left: %d / followers: %d / spent today: %d of %d",
 		userKey,
 		points.length,
 		quota.remaining,
-		getFollowerCount()
+		getFollowerCount(),
+		daily.spent,
+		daily.limit
 	);
 
 	return respond(request, result({ status: "scanned", locations: points.length }));
