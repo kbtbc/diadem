@@ -119,9 +119,17 @@
 					<span class="whitespace-nowrap">{untilLabel(info)}</span>
 				</div>
 				<div class="flex justify-between gap-6">
-					<span class="text-muted-foreground">{m.followme_info_scans()}</span>
+					<span class="text-muted-foreground">{m.followme_info_scans_used()}</span>
+					<!--
+						The hourly allowance, which is a balance. It used to read
+						"2 \u00b7 49" - scans so far, then the points in the last scan - and
+						was read as two of forty-nine, a bank of something. This is the
+						number that was being looked for.
+					-->
 					<span class="whitespace-nowrap">
-						{info.scanCount}{info.points ? " \u00b7 " + info.points : ""}
+						{info.scansPerHour
+							? m.followme_info_of({ used: info.scansUsed, limit: info.scansPerHour })
+							: info.scanCount}
 					</span>
 				</div>
 				{#if detached}

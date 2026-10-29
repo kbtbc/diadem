@@ -14,20 +14,23 @@
 		title,
 		description,
 		onclick,
-		children
+		children,
+		class: class_ = ""
 	}: {
 		Icon: LucideIcon;
 		title: string;
 		description: string;
 		onclick: () => void;
 		children?: Snippet;
+		/** For a row that is part of a larger card and should not draw its own. */
+		class?: string;
 	} = $props();
 
 	let toolsClass: string = $derived(isMenuSidebar() ? "tools-sidebar" : "tools-mobile");
 </script>
 
 <Button
-	class="{toolsClass} rounded-lg flex-col! w-full! items-start! gap-0! font-normal! border bg-card text-card-foreground shadow-md px-4 relative overflow-hidden group"
+	class="{toolsClass} rounded-lg flex-col! w-full! items-start! gap-0! font-normal! border bg-card text-card-foreground shadow-md px-4 relative overflow-hidden group {class_}"
 	variant=""
 	size=""
 	{onclick}
@@ -42,17 +45,22 @@
 	<div
 		class="absolute top-0 right-0 bg-linear-to-r from-background to-background/50 w-1/2 h-full"
 	></div>
-	<div class="flex gap-4 items-center group relative z-20">
+	<!--
+		min-w-0 on both: without it the description cannot shrink below its own
+		width, so a line like "Scan around you as you move" ran off the right of
+		a phone screen instead of wrapping.
+	-->
+	<div class="flex gap-4 items-center group relative z-20 w-full min-w-0">
 		<Card
 			class="tools-icon bg-card text-muted-foreground flex items-center justify-center aspect-square"
 		>
 			<Icon class="tools-icon-icon" />
 		</Card>
-		<div>
+		<div class="min-w-0">
 			<div class="flex items-center gap-2 w-full font-semibold">
 				<span>{title}</span>
 			</div>
-			<p class="text-muted-foreground">
+			<p class="text-muted-foreground text-wrap text-left">
 				{description}
 			</p>
 		</div>

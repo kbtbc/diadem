@@ -7,6 +7,7 @@ import {
 } from "@/lib/server/db/internal/followAlertSessions";
 import { getServerConfig } from "@/lib/services/config/config.server";
 import { getLogger } from "@/lib/utils/logger";
+import { rangeDistanceMeters } from "@/lib/utils/rangeGeometry";
 import {
 	FOLLOW_PROFILE_NAME,
 	HOME_PROFILE_NAME,
@@ -216,6 +217,7 @@ export async function moveAlerts(userId: string, lat: number, lon: number) {
 		const now = Date.now();
 		if (!shouldMoveAlerts(session.lastPushed, lat, lon, now, limits())) return;
 
+		const previous = session.lastPushed;
 		// Written before the call rather than after, so a slow Poracle cannot
 		// have a queue of updates pile up behind it.
 		session.lastPushed = { lat, lon, at: now };
@@ -225,7 +227,20 @@ export async function moveAlerts(userId: string, lat: number, lon: number) {
 			"POST",
 			{ latitude: lat, longitude: lon }
 		);
-		if (response?.ok) return;
+		if (response?.ok) {
+			// Logged on success as well as failure: without it there is no way to
+			// tell a session that moved somebody's alerts from one that silently
+			// pushed once at the start and never again.
+			log.info(
+				"Moved %s's alerts / %s / profile: %d",
+				userId,
+				previous
+					? Math.round(rangeDistanceMeters([previous.lon, previous.lat], [lon, lat])) + " m on"
+					: "session start",
+				session.followProfileNo
+			);
+			return;
+		}
 
 		log.warning(
 			"Moving %s's alerts returned %s",

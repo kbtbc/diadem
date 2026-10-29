@@ -58,29 +58,40 @@
 				</p>
 			</Card>
 		{:else}
-			<ToolLink
-				Icon={LocateFixed}
-				title={m.tool_follow_me_title()}
-				description={getFollowMeSummary()}
-				onclick={toggleFollowMe}
-			></ToolLink>
-		{/if}
-		{#if getConfig().tools.followMeAlerts}
 			<!--
-				The one option follow-me has. It lives here rather than on the chip
-				because it is a decision about a user's Discord alerts, not about the
-				map, and it is the opt-in: without it nothing of theirs is touched.
+				The toggle is part of the follow-me card rather than a row floating
+				under it: it is an option belonging to this tool and nothing else, and
+				a switch sitting on its own below the card read as a separate setting.
+				It stays outside the button, because a switch inside one is a button
+				inside a button - the tool would fire every time it was flipped.
 			-->
-			<label class="flex cursor-pointer items-center justify-between gap-3 px-4 py-1 text-sm">
-				<span class="text-muted-foreground">{m.followme_alerts_toggle()}</span>
-				<Switch
-					checked={getUserSettings().followMeMoveAlerts}
-					onCheckedChange={(checked) => {
-						getUserSettings().followMeMoveAlerts = checked;
-						updateUserSettings();
-					}}
-				/>
-			</label>
+			<div
+				class={getConfig().tools.followMeAlerts
+					? "bg-card text-card-foreground overflow-hidden rounded-lg border shadow-md"
+					: ""}
+			>
+				<ToolLink
+					Icon={LocateFixed}
+					title={m.tool_follow_me_title()}
+					description={getFollowMeSummary()}
+					onclick={toggleFollowMe}
+					class={getConfig().tools.followMeAlerts ? "border-0! shadow-none!" : ""}
+				></ToolLink>
+				{#if getConfig().tools.followMeAlerts}
+					<label
+						class="flex cursor-pointer items-center justify-between gap-3 border-t px-4 py-2.5 text-sm"
+					>
+						<span class="text-muted-foreground min-w-0">{m.followme_alerts_toggle()}</span>
+						<Switch
+							checked={getUserSettings().followMeMoveAlerts}
+							onCheckedChange={(checked) => {
+								getUserSettings().followMeMoveAlerts = checked;
+								updateUserSettings();
+							}}
+						/>
+					</label>
+				{/if}
+			</div>
 		{/if}
 	{/if}
 

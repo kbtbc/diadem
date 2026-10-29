@@ -77,6 +77,9 @@ const TICK_MOVING_MS = 5_000;
 /** How long to wait after a transient refusal before asking again. */
 const FOLLOW_ME_BACKOFF_MS = 60_000;
 
+/** And after a request that never got an answer at all. */
+const FAILED_SCAN_BACKOFF_MS = 15_000;
+
 /** Below this the user counts as standing still. */
 const STATIONARY_SPEED_KMH = 1;
 
@@ -91,6 +94,9 @@ export type FollowMeStatus =
 export type FollowMeResult = {
 	status: "scanned" | "covered" | "quota" | "busy";
 	locations?: number;
+	/** Scans left this hour, and the hourly allowance they came out of. */
+	scansLeft?: number;
+	scansPerHour?: number;
 	/** Set when it was the daily allowance rather than the hourly one. */
 	daily?: boolean;
 };
@@ -110,6 +116,8 @@ let inFlight = false;
 let timer: ReturnType<typeof setTimeout> | undefined = undefined;
 let nextWakeAt = 0;
 let lastScanPoints = 0;
+let scansUsed = 0;
+let scansPerHour = 0;
 let backoffUntil = 0;
 let unsubscribeLocation: (() => void) | undefined = undefined;
 let restoreAttempted = false;
@@ -236,6 +244,8 @@ export function getFollowMeSnapshot() {
 	return {
 		now: Date.now(),
 		scanCount,
+		scansUsed,
+		scansPerHour,
 		lastScanAt,
 		nextScanAt: Math.max(cooldownEndsAt, backoffUntil),
 		points: lastScanPoints
@@ -351,7 +361,7 @@ function watchScanCompletion(points: number) {
 
 		if (queue === 0) {
 			if (status === "scanning") status = "idle";
-			openToast(m.followme_toast_done({ count: points }));
+			openToast(m.followme_toast_done());
 			completionTimer = undefined;
 			return;
 		}
@@ -405,6 +415,14 @@ async function requestScan(center: Coords): Promise<void> {
 		// the scan takes, which says the same thing without covering the map.
 		const points = data.result.locations ?? 0;
 		lastScanPoints = points;
+
+		// The hourly allowance, as the server counted it. The chip used to show
+		// the points in the last scan next to the scan count, which read as a
+		// balance of something and was not one.
+		if (data.result.scansPerHour) {
+			scansPerHour = data.result.scansPerHour;
+			scansUsed = scansPerHour - (data.result.scansLeft ?? scansPerHour);
+		}
 		watchScanCompletion(points);
 		return;
 	}
@@ -466,7 +484,15 @@ async function tick() {
 	const center = new Coords(location.lat, location.lng);
 	if (!shouldScan(now, center)) {
 		// "scanning" belongs to the completion watcher until it resolves.
-		if (status === "locating") status = "idle";
+		//
+		// "error" is cleared here too. A request that throws is nearly always the
+		// tab having been frozen in the background - Android Chrome drops
+		// in-flight fetches when the user switches to the game - and it used to
+		// stay on screen until the next scan was due, so a tester came back to
+		// the map and found "Error" sitting there minutes after the thing had
+		// recovered. A real outage re-sets it on every attempt, so nothing is
+		// hidden by this.
+		if (status === "locating" || status === "error") status = "idle";
 		return;
 	}
 
@@ -478,6 +504,9 @@ async function tick() {
 		await requestScan(center);
 	} catch {
 		status = "error";
+		// Long enough that a real outage is not hammered, short enough that a
+		// frozen-tab blip is over before the user has finished looking at it.
+		backoffUntil = Date.now() + FAILED_SCAN_BACKOFF_MS;
 	} finally {
 		inFlight = false;
 	}
@@ -626,6 +655,8 @@ export function startFollowMe() {
 	speedPaused = false;
 	backoffUntil = 0;
 	scanCount = 0;
+	scansUsed = 0;
+	scansPerHour = 0;
 	clearNotice();
 
 	ensureLocationWatch(getMap());

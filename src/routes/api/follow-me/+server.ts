@@ -16,6 +16,7 @@ import { chargeDailyLocations, refundDailyLocations } from "@/lib/server/feature
 import {
 	consumeFollowMeQuota,
 	getFollowerCount,
+	getScansPerHour,
 	refundFollowMeQuota,
 	releaseFollowerSlot,
 	reserveFollowerSlot,
@@ -212,5 +213,13 @@ export async function POST({ request, locals }) {
 		exempt ? " / coverage check skipped" : ""
 	);
 
-	return respond(request, result({ status: "scanned", locations: points.length }));
+	return respond(
+		request,
+		result({
+			status: "scanned",
+			locations: points.length,
+			scansLeft: quota.remaining,
+			scansPerHour: getScansPerHour()
+		})
+	);
 }

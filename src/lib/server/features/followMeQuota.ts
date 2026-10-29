@@ -27,6 +27,11 @@ const FOLLOWER_TTL_MS = 10 * 60_000;
 const limitsConfig = getServerConfig().followMe;
 const scansPerHour = limitsConfig?.scansPerHour ?? DEFAULT_SCANS_PER_HOUR;
 const maxFollowers = limitsConfig?.maxFollowers ?? DEFAULT_MAX_FOLLOWERS;
+
+/** The allowance a remaining count is measured against, for the chip. */
+export function getScansPerHour() {
+	return scansPerHour;
+}
 const queueLimit = limitsConfig?.queueLimit ?? DEFAULT_QUEUE_LIMIT;
 
 /**
