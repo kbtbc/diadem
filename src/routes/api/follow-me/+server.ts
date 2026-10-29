@@ -21,6 +21,7 @@ import {
 	reserveFollowerSlot,
 	scoutQueueIsBusy
 } from "@/lib/server/features/followMeQuota";
+import { getServerConfig } from "@/lib/services/config/config.server";
 import { Features } from "@/lib/utils/features";
 import { Coords } from "@/lib/utils/coordinates";
 import { getLogger } from "@/lib/utils/logger";
@@ -55,6 +56,18 @@ export async function GET({ locals, request }) {
 	if (queue === undefined) return respond(request, result(undefined, "Internal Error"));
 
 	return respond(request, result({ queue }));
+}
+
+/**
+ * Whether this user may scan inside an area we already cover.
+ *
+ * Configured by hand and expected to hold one or two ids: coverage is the only
+ * refusal that ends the session instead of retrying, so without this nobody
+ * can exercise a full follow-me session without first driving out of town.
+ */
+function skipsCoverageCheck(discordId: string | undefined): boolean {
+	if (!discordId) return false;
+	return (getServerConfig().followMe?.coverageExemptDiscordIds ?? []).includes(discordId);
 }
 
 /**
@@ -128,7 +141,8 @@ export async function POST({ request, locals }) {
 	// cannot aim 49 scouts at coordinates of its choosing.
 	const points = getHex7Coords(new Coords(lat, lon));
 
-	const coverage = await overlapsCoveredArea(points);
+	const exempt = skipsCoverageCheck(locals.user?.discordId);
+	const coverage = exempt ? { covered: false as const } : await overlapsCoveredArea(points);
 	if (coverage === undefined) {
 		// The area store did not answer, so we are blind rather than busy.
 		log.warning(
@@ -188,13 +202,14 @@ export async function POST({ request, locals }) {
 	}
 
 	log.info(
-		"Follow-me scan queued / user: %s / locations: %d / quota left: %d / followers: %d / spent today: %d of %d",
+		"Follow-me scan queued / user: %s / locations: %d / quota left: %d / followers: %d / spent today: %d of %d%s",
 		userKey,
 		points.length,
 		quota.remaining,
 		getFollowerCount(),
 		daily.spent,
-		daily.limit
+		daily.limit,
+		exempt ? " / coverage check skipped" : ""
 	);
 
 	return respond(request, result({ status: "scanned", locations: points.length }));

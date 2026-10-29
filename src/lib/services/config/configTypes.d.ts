@@ -250,6 +250,16 @@ export type ServerConfig = {
 		 * "overlap".
 		 */
 		overlapMode?: "overlap" | "center";
+		/**
+		 * Discord ids that may scan inside a covered area anyway.
+		 *
+		 * For testing follow-me without driving out of town first: coverage is
+		 * the one refusal that stops the session rather than retrying, so there
+		 * is otherwise no way to exercise a whole session from a desk. Every scan
+		 * one of these users gets still costs them quota and daily allowance, and
+		 * is logged as having skipped the check.
+		 */
+		coverageExemptDiscordIds?: string[];
 		/*
 		 * There is deliberately no covered/uncovered area list here any more:
 		 * coverage comes from Dragonite's /v2/areas/, which carries the mode
