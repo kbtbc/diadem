@@ -4,11 +4,17 @@
 
 	let {
 		class: class_ = "",
+		thumbClass = "",
 		checked = $bindable(),
 		label,
 		...rest
 	}: {
 		class?: string;
+		/**
+		 * Goes on the thumb. A smaller switch needs both this and class: the
+		 * track's size and the distance the thumb travels have to agree.
+		 */
+		thumbClass?: string;
 		checked?: boolean;
 		label?: Snippet;
 	} & SwitchPrimitive.RootProps = $props();
@@ -21,7 +27,7 @@
 
 {#snippet thumb()}
 	<SwitchPrimitive.Thumb
-		class="bg-background pointer-events-none block size-5 rounded-full shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
+		class="bg-background pointer-events-none block size-5 rounded-full shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0 {thumbClass}"
 	/>
 {/snippet}
 

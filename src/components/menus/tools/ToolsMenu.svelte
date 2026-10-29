@@ -9,6 +9,7 @@
 	import { getUserDetails } from "@/lib/services/user/userDetails.svelte";
 	import { Features } from "@/lib/utils/features";
 	import { isSupportedFeature } from "@/lib/services/supportedFeatures";
+	import { isMenuSidebar } from "@/lib/utils/device";
 	import {
 		getCoords,
 		getScoutGeojsons,
@@ -78,11 +79,25 @@
 					class={getConfig().tools.followMeAlerts ? "border-0! shadow-none!" : ""}
 				></ToolLink>
 				{#if getConfig().tools.followMeAlerts}
-					<label
-						class="flex cursor-pointer items-center justify-between gap-3 border-t px-4 py-2.5 text-sm"
-					>
-						<span class="text-muted-foreground min-w-0">{m.followme_alerts_toggle()}</span>
+					<!--
+						Indented to the text column rather than the card edge, so it reads
+						as a third line of this tool and not as a setting of its own. The
+						spacer matches ToolLink's icon exactly - spacing*12 on a phone,
+						spacing*10 in the sidebar - which is why it asks isMenuSidebar the
+						same question ToolLink does.
+					-->
+					<label class="-mt-3 flex cursor-pointer items-center gap-4 px-4 pb-3">
+						<div
+							class="shrink-0 {isMenuSidebar() ? 'size-10' : 'size-12'}"
+							aria-hidden="true"
+						></div>
+						<span class="text-muted-foreground min-w-0 flex-1 text-xs">
+							{m.followme_alerts_toggle()}
+						</span>
+						<!-- Smaller than the stock switch, to match the line it sits on. -->
 						<Switch
+							class="h-5! w-9!"
+							thumbClass="size-4! data-[state=checked]:translate-x-4!"
 							checked={getUserSettings().followMeMoveAlerts}
 							onCheckedChange={(checked) => {
 								getUserSettings().followMeMoveAlerts = checked;
