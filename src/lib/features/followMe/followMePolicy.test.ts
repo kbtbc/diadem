@@ -113,11 +113,11 @@ describe("follow-me speed gate", () => {
 
 	it("leaves walking and traffic alone at the shipped threshold", () => {
 		// 10 km/h was a jog, and cyclists and crawling traffic tripped it.
-		// 45 was the second try, and it was ordinary town driving.
-		for (const kmh of [5, 15, 25, 35, 45, 55]) {
+		// 45 and 60 were the earlier tries, and both caught town driving.
+		for (const kmh of [5, 15, 25, 35, 45, 55, 65, 85]) {
 			expect(speedGateBlocks(kmh, false)).toBe(false);
 		}
-		expect(speedGateBlocks(75, false)).toBe(true);
+		expect(speedGateBlocks(100, false)).toBe(true);
 	});
 
 	it("honours configured limits", () => {
@@ -222,7 +222,8 @@ describe("follow-me speed gate", () => {
 	});
 
 	it("comes off pause once stale driving samples age out", () => {
-		const driving = samples([25, 25, 25]);
+		// 30 m/s is 108 km/h: over the trip threshold, as a motorway should be.
+		const driving = samples([30, 30, 30]);
 		let paused = speedGateBlocks(medianSpeedKmh(driving, NOW), false);
 		expect(paused).toBe(true);
 
