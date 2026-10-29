@@ -398,6 +398,35 @@ function handleGeolocationPosition(s: GeolocationPosition, map: maplibre.Map | u
 }
 
 /**
+ * A fix that did not arrive, during a follow-me session.
+ *
+ * This used to go straight to handleGeolocationError and resetLocate, and that
+ * combination was quietly fatal to the whole point of the feature. resetLocate
+ * stops the camera and only then returns early at the watchPinned guard - so
+ * the map stopped following - while watchId was left set, which meant
+ * ensureLocationWatch could never replace the dead watch. Meanwhile
+ * handleGeolocationError cleared currentLocation and put a toast on screen.
+ *
+ * One timeout did all of that for the rest of the drive. With
+ * enableHighAccuracy and a ten-second limit, a timeout is what a phone
+ * produces every time it goes under a bridge, into a car park, or comes back
+ * from the background - which is exactly what follow-me asks users to do. A
+ * tester reported it as "I thought the map was following me, but it isn't".
+ *
+ * A fix that did not arrive is not the user asking to look somewhere else, so
+ * the camera is left where it is, the last known position is kept, and the
+ * watch is replaced. No toast either: one every ten seconds for a GPS gap
+ * would be worse than the gap. A denied permission is not transient and still
+ * tears the whole thing down, through the path above.
+ */
+function restartPinnedWatch(map: maplibre.Map | undefined) {
+	if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
+	watchId = undefined;
+	isFetchingLocation = false;
+	ensureLocationWatch(map);
+}
+
+/**
  * Make sure a position watch is running, without touching camera follow.
  *
  * updateLocation() is the locate button: called again while watching it toggles
@@ -477,6 +506,10 @@ function beginLocate(map: maplibre.Map | undefined, allowFollow: boolean) {
 		watchId = navigator.geolocation.watchPosition(
 			(s) => handleGeolocationPosition(s, map),
 			(e) => {
+				if (watchPinned && e.code !== 1) {
+					restartPinnedWatch(map);
+					return;
+				}
 				handleGeolocationError(e);
 				resetLocate();
 			},
