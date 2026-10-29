@@ -71,6 +71,8 @@ export type UserSettings = {
 		tappable: UiconSetUS;
 	};
 	isLeftHanded: boolean;
+	/** Move the user's Poracle alerts with them while follow-me runs. */
+	followMeMoveAlerts: boolean;
 	themeMode: "dark" | "light" | "system";
 	loadMapObjectsWhileMoving: boolean;
 	loadMapObjectsPadding: number;
@@ -136,6 +138,7 @@ export function getDefaultUserSettings(): UserSettings {
 			tappable: getDefaultIconSet(MapObjectType.TAPPABLE)
 		},
 		isLeftHanded: false,
+		followMeMoveAlerts: false,
 		themeMode: "system",
 		loadMapObjectsWhileMoving: false,
 		loadMapObjectsPadding: 20,

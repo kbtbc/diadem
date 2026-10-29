@@ -4,6 +4,7 @@ import { remoteLocaleProvider } from "@/lib/server/provider/remoteLocaleProvider
 import { uiconsIndexProvider } from "@/lib/server/provider/uiconsIndexProvider";
 import { startFortApiDetection } from "@/lib/server/api/golbat/fortAvailability";
 import { initCpuWorkers } from "@/lib/server/workers/cpu";
+import { restoreStrandedAlertFollows } from "@/lib/server/features/followMeAlerts";
 import { getLogger } from "@/lib/utils/logger";
 
 export async function initDiadem() {
@@ -18,5 +19,9 @@ export async function initDiadem() {
 		masterstatsProvider.refresh(),
 		startFortApiDetection()
 	]);
+	// Anyone a restart left on a follow profile, put back before they notice
+	// their alerts measuring from the wrong place. Never blocks startup.
+	void restoreStrandedAlertFollows();
+
 	log.info("Finished initializing");
 }
