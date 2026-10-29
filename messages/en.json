@@ -1071,7 +1071,7 @@
 	"followme_covered_title": "Already in an existing scan area",
 	"followme_covered_lead": "Follow-Me only works outside existing",
 	"followme_covered_link": "scan boundaries",
-	"followme_toast_done": "Scan finished, {count} points covered",
+	"followme_toast_done": "Scan finished",
 	"followme_toast_slow": "Scouts are busy, your scan is still running",
 	"followme_chip_recenter": "Recenter",
 	"followme_chip_recenter_title": "Have the map follow you again",
@@ -1079,12 +1079,13 @@
 	"followme_chip_info_title": "Tap for scan details",
 	"followme_info_last_scan": "Last scan",
 	"followme_info_next_scan": "Next scan",
-	"followme_info_scans": "Scans",
 	"followme_info_minutes": "{count} min",
 	"followme_info_just_now": "just now",
 	"followme_info_due": "due now",
 	"followme_info_none": "none yet",
 	"followme_info_on_move": "when you move",
 	"followme_info_stop": "Stop following",
-	"followme_alerts_toggle": "Move my Discord alerts with me"
+	"followme_alerts_toggle": "Move my Discord alerts with me",
+	"followme_info_scans_used": "Scans used",
+	"followme_info_of": "{used} of {limit}"
 }
