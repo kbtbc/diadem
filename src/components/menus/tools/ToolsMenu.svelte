@@ -86,7 +86,7 @@
 						spacing*10 in the sidebar - which is why it asks isMenuSidebar the
 						same question ToolLink does.
 					-->
-					<label class="-mt-3 flex cursor-pointer items-center gap-4 px-4 pb-3">
+					<label class="-mt-4 flex cursor-pointer items-center gap-4 px-4 pb-2">
 						<div
 							class="shrink-0 {isMenuSidebar() ? 'size-10' : 'size-12'}"
 							aria-hidden="true"
@@ -96,8 +96,8 @@
 						</span>
 						<!-- Smaller than the stock switch, to match the line it sits on. -->
 						<Switch
-							class="h-5! w-9!"
-							thumbClass="size-4! data-[state=checked]:translate-x-4!"
+							class="h-4! w-7!"
+							thumbClass="size-3! data-[state=checked]:translate-x-3!"
 							checked={getUserSettings().followMeMoveAlerts}
 							onCheckedChange={(checked) => {
 								getUserSettings().followMeMoveAlerts = checked;
