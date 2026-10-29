@@ -72,7 +72,8 @@
 		>
 			<IconValue
 				Icon={scanning ? LoaderCircle : detached ? Locate : paused ? LocateOff : LocateFixed}
-				class={scanning ? "animate-spin" : paused && !detached ? "opacity-70" : ""}
+				class={paused && !detached ? "opacity-70" : ""}
+				iconClass={scanning ? "animate-spin" : ""}
 			>
 				<span class="whitespace-nowrap">
 					{detached ? m.followme_chip_recenter() : getFollowMeChipLabel()}
