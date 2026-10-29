@@ -208,6 +208,24 @@ export type ServerConfig = {
 		/** Copy linked trainers to the user's Poracle accounts. Default false. */
 		syncLinkedTrainers?: boolean;
 	};
+	scout?: {
+		/**
+		 * Scout locations one user may queue per day, across follow-me and the
+		 * manual scout tool together. Default 8000, about 163 follow-me scans.
+		 */
+		locationsPerDay?: number;
+		/** Most locations one request may ask for. Default 64. */
+		maxLocationsPerRequest?: number;
+		/**
+		 * Ask scouts for route data. Default false: routes are static, so asking
+		 * on every scan pays repeatedly for the same answer.
+		 */
+		routes?: boolean;
+		/** Ask scouts for showcase data. Default true. */
+		showcases?: boolean;
+		/** Ask scouts for gyms and stops (get-map-forts). Default true. */
+		forts?: boolean;
+	};
 	followMe?: {
 		/** Scans per user per hour. Default 24. */
 		scansPerHour?: number;

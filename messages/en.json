@@ -1075,5 +1075,6 @@
 	"followme_toast_done": "Scan finished, {count} points covered",
 	"followme_toast_slow": "Scouts are busy, your scan is still running",
 	"followme_chip_recenter": "Recenter",
-	"followme_chip_recenter_title": "Have the map follow you again"
+	"followme_chip_recenter_title": "Have the map follow you again",
+	"followme_stopped_daily": "Follow me turned off: daily scan limit reached"
 }

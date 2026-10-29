@@ -2,8 +2,10 @@ import {
 	boolean,
 	datetime,
 	index,
+	int,
 	json,
 	mysqlTable,
+	primaryKey,
 	text,
 	uniqueIndex,
 	varchar
@@ -121,3 +123,30 @@ export const linkedTrainer = mysqlTable(
 export type LinkedTrainer = typeof linkedTrainer.$inferSelect;
 
 export type User = typeof user.$inferSelect;
+
+/**
+ * Scout locations a user has spent today, across every endpoint that spends
+ * them - follow-me and the manual scout tool draw on one allowance.
+ *
+ * This is in the database rather than in memory because the hourly limiter is
+ * RateLimiterMemory, which resets on every restart. An hour mostly survives
+ * that; a day does not, and a daily cap a deploy wipes is not a cap. Rows are
+ * disposable: anything older than yesterday can be deleted at any time.
+ */
+export const scoutDailySpend = mysqlTable(
+	"scout_daily_spend",
+	{
+		userId: varchar("user_id", { length: 255 })
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		/** Calendar day as YYYY-MM-DD, in the server's own timezone. */
+		day: varchar("day", { length: 10 }).notNull(),
+		locations: int("locations").notNull(),
+		updatedAt: datetime("updated_at").notNull()
+	},
+	(table) => ({
+		pk: primaryKey({ columns: [table.userId, table.day] })
+	})
+);
+
+export type ScoutDailySpend = typeof scoutDailySpend.$inferSelect;

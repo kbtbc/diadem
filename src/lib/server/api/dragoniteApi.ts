@@ -20,14 +20,19 @@ function getHeaders() {
 export async function addScoutEntries(username: string, locations: number[][]) {
 	const url = new URL("scout/v2", getServerConfig().dragonite.url);
 
+	// Everything a scout is asked for costs time at the location, so all three
+	// extras are switchable and only pokemon is fixed on. Routes default off:
+	// they are static, and follow-me rescans the same user every 90 seconds, so
+	// asking each time was paying repeatedly for one answer.
+	const scout = getServerConfig().scout;
 	const requestData = {
 		username,
 		locations,
 		options: {
-			routes: true,
-			showcases: true,
+			routes: scout?.routes ?? false,
+			showcases: scout?.showcases ?? true,
 			pokemon: true,
-			gmf: true
+			gmf: scout?.forts ?? true
 		}
 	};
 

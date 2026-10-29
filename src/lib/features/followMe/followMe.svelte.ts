@@ -35,7 +35,11 @@ export {
 export const FOLLOW_ME_IDLE_TIMEOUT_MS = 30 * 60_000;
 
 /** A playing session, not an hour - users were hitting the old cap mid-outing. */
-export const FOLLOW_ME_SESSION_TIMEOUT_MS = 3 * 60 * 60_000;
+export const FOLLOW_ME_SESSION_TIMEOUT_MS = 2 * 60 * 60_000;
+// Two hours, not three: long enough for an outing, short enough that a session
+// left on by accident stops before it has spent much. It is not an overall
+// ceiling - starting another one straight afterwards is fine, and the daily
+// location allowance is what actually bounds the day.
 
 /**
  * Switching to the game is the entire point of the feature, and walking to a
@@ -87,6 +91,8 @@ export type FollowMeStatus =
 export type FollowMeResult = {
 	status: "scanned" | "covered" | "quota" | "busy";
 	locations?: number;
+	/** Set when it was the daily allowance rather than the hourly one. */
+	daily?: boolean;
 };
 
 let active: boolean = $state(false);
@@ -388,7 +394,12 @@ async function requestScan(center: Coords): Promise<void> {
 
 	if (data.result.status === "quota") {
 		stopFollowMe();
-		openToast(m.followme_stopped_quota(), TOAST_EXPLAIN_MS);
+		// Which limit matters to the user: waiting an hour fixes one of these and
+		// does nothing for the other.
+		openToast(
+			data.result.daily ? m.followme_stopped_daily() : m.followme_stopped_quota(),
+			TOAST_EXPLAIN_MS
+		);
 		return;
 	}
 
