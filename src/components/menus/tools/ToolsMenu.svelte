@@ -22,6 +22,8 @@
 		toggleFollowMe
 	} from "@/lib/features/followMe/followMe.svelte";
 	import Card from "@/components/ui/Card.svelte";
+	import Switch from "@/components/ui/input/Switch.svelte";
+	import { getUserSettings, updateUserSettings } from "@/lib/services/userSettings.svelte";
 	import { getMap } from "@/lib/map/map.svelte";
 	import { Coords } from "@/lib/utils/coordinates";
 	import { getDefaultMapStyle } from "@/lib/services/themeMode";
@@ -62,6 +64,23 @@
 				description={getFollowMeSummary()}
 				onclick={toggleFollowMe}
 			></ToolLink>
+		{/if}
+		{#if getConfig().tools.followMeAlerts}
+			<!--
+				The one option follow-me has. It lives here rather than on the chip
+				because it is a decision about a user's Discord alerts, not about the
+				map, and it is the opt-in: without it nothing of theirs is touched.
+			-->
+			<label class="flex cursor-pointer items-center justify-between gap-3 px-4 py-1 text-sm">
+				<span class="text-muted-foreground">{m.followme_alerts_toggle()}</span>
+				<Switch
+					checked={getUserSettings().followMeMoveAlerts}
+					onCheckedChange={(checked) => {
+						getUserSettings().followMeMoveAlerts = checked;
+						updateUserSettings();
+					}}
+				/>
+			</label>
 		{/if}
 	{/if}
 

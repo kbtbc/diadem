@@ -1,3 +1,4 @@
+import { callPoracle } from "@/lib/server/api/poracleApi";
 import { getServerConfig } from "@/lib/services/config/config.server";
 import { getLogger } from "@/lib/utils/logger";
 
@@ -8,7 +9,6 @@ import { getLogger } from "@/lib/utils/logger";
 
 const log = getLogger("poracle");
 
-const TIMEOUT_MS = 10_000;
 // How long Poracle's /health answer (whether it supports linked accounts) is trusted
 const CAPABILITY_TTL_MS = 5 * 60_000;
 // Linked trainers that Poracle is missing are added at most this often per user
@@ -30,31 +30,6 @@ function getSettings() {
 
 export function isPoracleSyncEnabled() {
 	return Boolean(getSettings());
-}
-
-async function callPoracle(
-	path: string,
-	method: "GET" | "POST" | "DELETE",
-	body?: unknown
-): Promise<Response | undefined> {
-	const poracle = getSettings();
-	if (!poracle) return undefined;
-
-	const headers: HeadersInit = { Accept: "application/json" };
-	if (poracle.secret) headers["X-Poracle-Secret"] = poracle.secret;
-	if (body !== undefined) headers["Content-Type"] = "application/json";
-
-	try {
-		return await fetch(new URL(path, poracle.url), {
-			method,
-			headers,
-			body: body === undefined ? undefined : JSON.stringify(body),
-			signal: AbortSignal.timeout(TIMEOUT_MS)
-		});
-	} catch (err) {
-		log.warning("[%s %s] Poracle request failed: %s", method, path, err);
-		return undefined;
-	}
 }
 
 /** Only PoracleNG with personal shiny support has the accounts API. */

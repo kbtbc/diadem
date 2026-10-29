@@ -4,6 +4,13 @@ import { readRequestBody } from "@/lib/server/api/requestBody";
 import { respond } from "@/lib/server/api/respond";
 import { result } from "@/lib/server/api/results";
 import { hasFeatureAnywhereServer } from "@/lib/server/auth/checkIfAuthed";
+import {
+	isAlertFollowEnabled,
+	isFollowingAlerts,
+	moveAlerts,
+	startAlertFollow,
+	stopAlertFollow
+} from "@/lib/server/features/followMeAlerts";
 import { overlapsCoveredArea } from "@/lib/server/features/followMeAreas";
 import { chargeDailyLocations, refundDailyLocations } from "@/lib/server/features/scoutBudget";
 import {
@@ -50,6 +57,18 @@ export async function GET({ locals, request }) {
 	return respond(request, result({ queue }));
 }
 
+/**
+ * Whether this user asked for their Discord alerts to come along.
+ *
+ * Read from the settings row rather than taken from the request, so a crafted
+ * body cannot move somebody else's alerts - and because this is the user's own
+ * consent, which belongs with the rest of their settings.
+ */
+function wantsAlertsMoved(user: { userSettings?: unknown } | null): boolean {
+	const settings = user?.userSettings as { followMeMoveAlerts?: boolean } | null | undefined;
+	return settings?.followMeMoveAlerts === true;
+}
+
 type FollowMeRequest = {
 	lat?: number;
 	lon?: number;
@@ -70,6 +89,7 @@ export async function POST({ request, locals }) {
 
 	if (body.stop) {
 		releaseFollowerSlot(userKey);
+		void stopAlertFollow(userKey);
 		log.info("Follow-me stopped / user: %s / followers: %d", userKey, getFollowerCount());
 		return respond(request, result({ status: "stopped" }));
 	}
@@ -80,6 +100,23 @@ export async function POST({ request, locals }) {
 		// A warning rather than a refusal: the client should never send these.
 		log.warning("Follow-me scan refused / user: %s / reason: invalid coords", userKey);
 		return respond(request, result(undefined, "Invalid Coords"));
+	}
+
+	// Deliberately not awaited, and deliberately ahead of every refusal below:
+	// a user driving through an area we already scan gets no scan, but still
+	// wants the distance in their alerts measured from where they are. Poracle
+	// being slow or down must never cost anybody a scan, so nothing here is on
+	// the path to the response.
+	if (isAlertFollowEnabled()) {
+		if (wantsAlertsMoved(locals.user)) {
+			const discordId = locals.user?.discordId;
+			if (discordId) {
+				void startAlertFollow(userKey, discordId).then(() => moveAlerts(userKey, lat, lon));
+			}
+		} else if (isFollowingAlerts(userKey)) {
+			// Switched off part-way through a session.
+			void stopAlertFollow(userKey);
+		}
 	}
 
 	if (!reserveFollowerSlot(userKey)) {

@@ -150,3 +150,26 @@ export const scoutDailySpend = mysqlTable(
 );
 
 export type ScoutDailySpend = typeof scoutDailySpend.$inferSelect;
+
+/**
+ * Users currently parked on a Poracle follow profile, so follow-me can move
+ * the location their Discord alerts measure distances from.
+ *
+ * In the database rather than in memory because what is lost otherwise is the
+ * only record that somebody needs putting back: a deploy would leave them with
+ * alerts pointed at wherever they happened to be. initDiadem sweeps whatever
+ * it finds here at startup.
+ */
+export const followAlertSession = mysqlTable("follow_alert_session", {
+	userId: varchar("user_id", { length: 255 })
+		.primaryKey()
+		.references(() => user.id, { onDelete: "cascade" }),
+	/** Their Poracle human id, which is the Discord snowflake. */
+	poracleId: varchar("poracle_id", { length: 255 }).notNull(),
+	followProfileNo: int("follow_profile_no").notNull(),
+	/** The profile they were on when the session started. */
+	returnProfileNo: int("return_profile_no").notNull(),
+	startedAt: datetime("started_at").notNull()
+});
+
+export type FollowAlertSession = typeof followAlertSession.$inferSelect;

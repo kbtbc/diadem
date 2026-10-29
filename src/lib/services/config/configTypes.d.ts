@@ -138,6 +138,8 @@ export type ClientConfig = {
 		scout: boolean;
 		/** Optional: absent means follow-me stays hidden. */
 		followMe?: boolean;
+		/** Offer to move the user's Poracle alerts along with follow-me. */
+		followMeAlerts?: boolean;
 	};
 	followMe?: {
 		/** Pause above this ground speed. Default 60. */
@@ -207,6 +209,15 @@ export type ServerConfig = {
 		secret?: string;
 		/** Copy linked trainers to the user's Poracle accounts. Default false. */
 		syncLinkedTrainers?: boolean;
+		/**
+		 * Move a user's alert location with them while follow-me runs, by
+		 * borrowing a "follow" profile. Default false.
+		 */
+		followMeAlerts?: boolean;
+		/** How far they must travel before their alerts move. Default 1000. */
+		alertMinMeters?: number;
+		/** And never more often than this. Default 60. */
+		alertMinSeconds?: number;
 	};
 	scout?: {
 		/**

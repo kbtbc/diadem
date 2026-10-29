@@ -1085,5 +1085,6 @@
 	"followme_info_due": "due now",
 	"followme_info_none": "none yet",
 	"followme_info_on_move": "when you move",
-	"followme_info_stop": "Stop following"
+	"followme_info_stop": "Stop following",
+	"followme_alerts_toggle": "Move my Discord alerts with me"
 }
