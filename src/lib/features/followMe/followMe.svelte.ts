@@ -7,6 +7,7 @@ import {
 } from "@/lib/map/geolocate.svelte";
 import { getMap } from "@/lib/map/map.svelte";
 import { getConfig } from "@/lib/services/config/config";
+import { getUserSettings } from "@/lib/services/userSettings.svelte";
 import * as m from "@/lib/paraglide/messages";
 import { openToast } from "@/lib/ui/toasts.svelte.js";
 import { Coords, type LatLon } from "@/lib/utils/coordinates";
@@ -80,6 +81,15 @@ const FOLLOW_ME_BACKOFF_MS = 60_000;
 /** And after a request that never got an answer at all. */
 const FAILED_SCAN_BACKOFF_MS = 15_000;
 
+/**
+ * How often to move a user's alerts while the speed gate is holding scans.
+ *
+ * Matches the floor the server applies anyway, so this only saves the round
+ * trips that would have been refused - the real decision is still the
+ * server's, measured in ground covered.
+ */
+const ALERT_ONLY_INTERVAL_MS = 60_000;
+
 /** Below this the user counts as standing still. */
 const STATIONARY_SPEED_KMH = 1;
 
@@ -119,6 +129,7 @@ let lastScanPoints = 0;
 let scansUsed = 0;
 let scansPerHour = 0;
 let backoffUntil = 0;
+let lastAlertOnlyAt = 0;
 let unsubscribeLocation: (() => void) | undefined = undefined;
 let restoreAttempted = false;
 let noticeKind: "covered" | undefined = $state(undefined);
@@ -472,6 +483,13 @@ async function tick() {
 
 	if (speedGateBlocks()) {
 		status = "too-fast";
+
+		// The gate stops scans, not alerts. Above 90 km/h is exactly when someone
+		// covers the ground that makes the distance printed in an alert wrong,
+		// and the scan request that normally carries their location never
+		// happens - so a first live drive put 5.6 km between two alert updates.
+		// This goes on its own instead.
+		void sendAlertLocation(now);
 		return;
 	}
 
@@ -654,6 +672,7 @@ export function startFollowMe() {
 	speedSamples = [];
 	speedPaused = false;
 	backoffUntil = 0;
+	lastAlertOnlyAt = 0;
 	scanCount = 0;
 	scansUsed = 0;
 	scansPerHour = 0;
@@ -697,6 +716,39 @@ export function stopFollowMe() {
 	// without waiting out the server's idle TTL. Best effort: the slot expires
 	// on its own if this never lands.
 	void releaseSlot();
+}
+
+/**
+ * Move the user's alerts without asking for a scan.
+ *
+ * Costs no quota and no scout time: the endpoint validates the coordinates,
+ * hands them to the alert follower and returns. Best effort throughout - a
+ * missed update is not worth a status change on the chip, and the next one is
+ * a minute away.
+ */
+async function sendAlertLocation(now: number) {
+	if (!getUserSettings().followMeMoveAlerts) return;
+	if (now - lastAlertOnlyAt < ALERT_ONLY_INTERVAL_MS) return;
+
+	const location = getCurrentLocation();
+	if (!location) return;
+
+	// Set before the request, so a slow answer cannot queue these up behind it.
+	lastAlertOnlyAt = now;
+
+	try {
+		const encoded = encodeRequestBody({
+			...new Coords(location.lat, location.lng).internal(),
+			alertsOnly: true
+		});
+		await fetch("/api/follow-me", {
+			method: "POST",
+			body: encoded.body,
+			headers: getHeaders(encoded.contentType)
+		});
+	} catch {
+		// Nothing to do: the next gated tick tries again.
+	}
 }
 
 async function releaseSlot() {
