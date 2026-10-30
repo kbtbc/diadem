@@ -13,6 +13,7 @@ import type {
 } from "@/lib/features/filters/filters";
 import { MapObjectType } from "@/lib/mapObjects/mapObjectTypes";
 import { getConfig } from "@/lib/services/config/config";
+import { dropRetiredPersonalShinyFiltersets } from "@/lib/features/filters/retiredPersonalShiny";
 import type { AnySearchEntry } from "@/lib/services/search.svelte";
 import { getDefaultMapStyle } from "@/lib/services/themeMode";
 import { getUserDetails } from "@/lib/services/user/userDetails.svelte.js";
@@ -336,6 +337,8 @@ function migrateUserSettings(settings: LegacyUserSettings): UserSettings {
 		}
 		delete settings.expandedMapObjects;
 	}
+
+	dropRetiredPersonalShinyFiltersets(settings.filters?.pokemon);
 
 	return settings as UserSettings;
 }
