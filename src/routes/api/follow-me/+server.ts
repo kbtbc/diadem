@@ -6,7 +6,6 @@ import { result } from "@/lib/server/api/results";
 import { hasFeatureAnywhereServer } from "@/lib/server/auth/checkIfAuthed";
 import {
 	isAlertFollowEnabled,
-	isFollowingAlerts,
 	moveAlerts,
 	startAlertFollow,
 	stopAlertFollow
@@ -71,18 +70,6 @@ function skipsCoverageCheck(discordId: string | undefined): boolean {
 	return (getServerConfig().followMe?.coverageExemptDiscordIds ?? []).includes(discordId);
 }
 
-/**
- * Whether this user asked for their Discord alerts to come along.
- *
- * Read from the settings row rather than taken from the request, so a crafted
- * body cannot move somebody else's alerts - and because this is the user's own
- * consent, which belongs with the rest of their settings.
- */
-function wantsAlertsMoved(user: { userSettings?: unknown } | null): boolean {
-	const settings = user?.userSettings as { followMeMoveAlerts?: boolean } | null | undefined;
-	return settings?.followMeMoveAlerts === true;
-}
-
 type FollowMeRequest = {
 	lat?: number;
 	lon?: number;
@@ -126,16 +113,17 @@ export async function POST({ request, locals }) {
 	// wants the distance in their alerts measured from where they are. Poracle
 	// being slow or down must never cost anybody a scan, so nothing here is on
 	// the path to the response.
-	if (isAlertFollowEnabled()) {
-		if (wantsAlertsMoved(locals.user)) {
-			const discordId = locals.user?.discordId;
-			if (discordId) {
-				void startAlertFollow(userKey, discordId).then(() => moveAlerts(userKey, lat, lon));
-			}
-		} else if (isFollowingAlerts(userKey)) {
-			// Switched off part-way through a session.
-			void stopAlertFollow(userKey);
-		}
+	//
+	// No opt-in: anybody whose alerts Poracle already sends gets them measured
+	// from where they are. The switch that used to gate this sat in the Tools
+	// menu asking a question most people had no way to answer - and the answer
+	// nearly everyone wants is yes, since the alternative is distances measured
+	// from a house they are not at. startAlertFollow is a no-op for anyone
+	// Poracle has never heard of, which is most users, so nobody who does not
+	// use Poracle gains a profile they did not ask for.
+	const discordId = locals.user?.discordId;
+	if (isAlertFollowEnabled() && discordId) {
+		void startAlertFollow(userKey, discordId).then(() => moveAlerts(userKey, lat, lon));
 	}
 
 	if (body.alertsOnly) {
@@ -143,9 +131,9 @@ export async function POST({ request, locals }) {
 		// from the scout pool. It also never starts a session - a session begins
 		// with a scan, and somebody who has been above the gate since they
 		// switched the feature on has not had one yet.
-		if (isAlertFollowEnabled() && wantsAlertsMoved(locals.user)) {
-			void moveAlerts(userKey, lat, lon);
-		}
+		// moveAlerts does nothing without a live session, so this cannot start
+		// one on its own.
+		if (isAlertFollowEnabled()) void moveAlerts(userKey, lat, lon);
 		return respond(request, result({ status: "paused" }));
 	}
 

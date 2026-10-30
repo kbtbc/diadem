@@ -7,7 +7,6 @@ import {
 } from "@/lib/map/geolocate.svelte";
 import { getMap } from "@/lib/map/map.svelte";
 import { getConfig } from "@/lib/services/config/config";
-import { getUserSettings } from "@/lib/services/userSettings.svelte";
 import * as m from "@/lib/paraglide/messages";
 import { openToast } from "@/lib/ui/toasts.svelte.js";
 import { Coords, type LatLon } from "@/lib/utils/coordinates";
@@ -727,7 +726,6 @@ export function stopFollowMe() {
  * a minute away.
  */
 async function sendAlertLocation(now: number) {
-	if (!getUserSettings().followMeMoveAlerts) return;
 	if (now - lastAlertOnlyAt < ALERT_ONLY_INTERVAL_MS) return;
 
 	const location = getCurrentLocation();
