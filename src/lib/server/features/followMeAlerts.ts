@@ -56,15 +56,6 @@ export function isAlertFollowEnabled() {
 	return Boolean(settings());
 }
 
-/**
- * Whether we are currently moving this user's alerts. The cheap check, for
- * noticing that somebody switched the option off part-way through a session
- * without reading the database on every scan.
- */
-export function isFollowingAlerts(userId: string) {
-	return live.has(userId);
-}
-
 function limits() {
 	const poracle = settings();
 	return resolveAlertLimits(poracle?.alertMinMeters, poracle?.alertMinSeconds);

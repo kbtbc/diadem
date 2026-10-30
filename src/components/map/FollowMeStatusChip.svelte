@@ -12,7 +12,7 @@
 		stopFollowMe
 	} from "@/lib/features/followMe/followMe.svelte.js";
 	import { getIsCameraFollowing } from "@/lib/map/geolocate.svelte";
-	import { onMount } from "svelte";
+	import { onDestroy, onMount } from "svelte";
 	import * as m from "@/lib/paraglide/messages";
 	import { Locate, LocateFixed, LoaderCircle, LocateOff } from "@lucide/svelte";
 	import { fade } from "svelte/transition";
@@ -27,12 +27,47 @@
 	// claiming to follow - which is exactly what it used to do.
 	let detached = $derived(getFollowMeActive() && !getIsCameraFollowing());
 
-	// Taken when the panel opens and never touched again: no timer runs over the
-	// map. Tapping the chip is not how you switch the feature off - that was a
-	// tap meaning two different things on invisible state, and it caught the
-	// tester out. Off is the button at the bottom of this panel, where it takes
-	// a deliberate second tap, and in the Tools menu.
+	// Re-read every second while the panel is open, and not at all once it is
+	// shut. It used to be a single reading taken when the panel opened, so "last
+	// scan" stayed on whatever it said, the countdown never counted down, and a
+	// scan that ran while somebody watched did not move the tally - three
+	// numbers that never change, which reads as a feature that has stopped.
+	//
+	// The cost being avoided was a timer re-rendering over the map. This one
+	// only runs while a user is looking at the panel it updates.
+	//
+	// Tapping the chip is not how you switch the feature off - that was a tap
+	// meaning two different things on invisible state, and it caught a tester
+	// out. Off is the button at the bottom of this panel, where it takes a
+	// deliberate second tap, and in the Tools menu.
 	let info: ReturnType<typeof getFollowMeSnapshot> | undefined = $state(undefined);
+	let infoTimer: ReturnType<typeof setInterval> | undefined = undefined;
+
+	/** Fast enough that a countdown in seconds is one. */
+	const INFO_REFRESH_MS = 1_000;
+
+	function openInfo() {
+		info = getFollowMeSnapshot();
+		infoTimer ??= setInterval(() => {
+			info = getFollowMeSnapshot();
+		}, INFO_REFRESH_MS);
+	}
+
+	function closeInfo() {
+		if (infoTimer) clearInterval(infoTimer);
+		infoTimer = undefined;
+		info = undefined;
+	}
+
+	// Stopping takes the chip off the map, panel and all, and there is nothing
+	// left to report - so the interval has no business outliving it. This covers
+	// the ways the session can end without anybody tapping Stop: the idle
+	// timeout, the session ceiling, a refusal.
+	$effect(() => {
+		if (!getFollowMeActive()) closeInfo();
+	});
+
+	onDestroy(closeInfo);
 
 	// A chip reading "Recenter" is a button that says what it does, so it had
 	// better do it: opening a panel instead read as broken. The panel is one
@@ -41,22 +76,30 @@
 	function onChipTap() {
 		if (detached) {
 			recenterFollowMe();
-			info = undefined;
+			closeInfo();
 			return;
 		}
-		info = info ? undefined : getFollowMeSnapshot();
+		if (info) closeInfo();
+		else openInfo();
 	}
 
 	function stop() {
-		info = undefined;
+		closeInfo();
 		stopFollowMe();
 	}
 
-	/** The row labels carry the direction, so one "N min" string does both. */
+	/**
+	 * The row labels carry the direction, so one set of strings does both.
+	 *
+	 * Seconds under the minute rather than "just now": a panel that updates and
+	 * a panel that is stuck look identical while every figure in it is rounded
+	 * to the nearest minute, and the first minute after a scan is exactly when
+	 * somebody opens this to check it is working.
+	 */
 	function sinceLabel(at: number, now: number): string {
 		if (!at) return m.followme_info_none();
 		const seconds = Math.round(Math.abs(now - at) / 1000);
-		if (seconds < 60) return m.followme_info_just_now();
+		if (seconds < 60) return m.followme_info_seconds({ count: seconds });
 		return m.followme_info_minutes({ count: Math.round(seconds / 60) });
 	}
 
@@ -70,8 +113,12 @@
 	 * movement is the part they control.
 	 */
 	function untilLabel(info: ReturnType<typeof getFollowMeSnapshot>): string {
-		if (info.nextScanAt > info.now) {
-			return m.followme_info_minutes({ count: Math.ceil((info.nextScanAt - info.now) / 60_000) });
+		const remaining = info.nextScanAt - info.now;
+		if (remaining > 60_000) {
+			return m.followme_info_minutes({ count: Math.ceil(remaining / 60_000) });
+		}
+		if (remaining > 0) {
+			return m.followme_info_seconds({ count: Math.ceil(remaining / 1000) });
 		}
 		return info.lastScanAt ? m.followme_info_on_move() : m.followme_info_due();
 	}

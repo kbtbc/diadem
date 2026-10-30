@@ -138,8 +138,6 @@ export type ClientConfig = {
 		scout: boolean;
 		/** Optional: absent means follow-me stays hidden. */
 		followMe?: boolean;
-		/** Offer to move the user's Poracle alerts along with follow-me. */
-		followMeAlerts?: boolean;
 	};
 	followMe?: {
 		/** Pause above this ground speed. Default 60. */

@@ -9,7 +9,6 @@
 	import { getUserDetails } from "@/lib/services/user/userDetails.svelte";
 	import { Features } from "@/lib/utils/features";
 	import { isSupportedFeature } from "@/lib/services/supportedFeatures";
-	import { isMenuSidebar } from "@/lib/utils/device";
 	import {
 		getCoords,
 		getScoutGeojsons,
@@ -23,8 +22,6 @@
 		toggleFollowMe
 	} from "@/lib/features/followMe/followMe.svelte";
 	import Card from "@/components/ui/Card.svelte";
-	import Switch from "@/components/ui/input/Switch.svelte";
-	import { getUserSettings, updateUserSettings } from "@/lib/services/userSettings.svelte";
 	import { getMap } from "@/lib/map/map.svelte";
 	import { Coords } from "@/lib/utils/coordinates";
 	import { getDefaultMapStyle } from "@/lib/services/themeMode";
@@ -59,54 +56,12 @@
 				</p>
 			</Card>
 		{:else}
-			<!--
-				The toggle is part of the follow-me card rather than a row floating
-				under it: it is an option belonging to this tool and nothing else, and
-				a switch sitting on its own below the card read as a separate setting.
-				It stays outside the button, because a switch inside one is a button
-				inside a button - the tool would fire every time it was flipped.
-			-->
-			<div
-				class={getConfig().tools.followMeAlerts
-					? "bg-card text-card-foreground overflow-hidden rounded-lg border shadow-md"
-					: ""}
-			>
-				<ToolLink
-					Icon={LocateFixed}
-					title={m.tool_follow_me_title()}
-					description={getFollowMeSummary()}
-					onclick={toggleFollowMe}
-					class={getConfig().tools.followMeAlerts ? "border-0! shadow-none!" : ""}
-				></ToolLink>
-				{#if getConfig().tools.followMeAlerts}
-					<!--
-						Indented to the text column rather than the card edge, so it reads
-						as a third line of this tool and not as a setting of its own. The
-						spacer matches ToolLink's icon exactly - spacing*12 on a phone,
-						spacing*10 in the sidebar - which is why it asks isMenuSidebar the
-						same question ToolLink does.
-					-->
-					<label class="-mt-4 flex cursor-pointer items-center gap-4 px-4 pb-2">
-						<div
-							class="shrink-0 {isMenuSidebar() ? 'size-10' : 'size-12'}"
-							aria-hidden="true"
-						></div>
-						<span class="text-muted-foreground min-w-0 flex-1 text-xs">
-							{m.followme_alerts_toggle()}
-						</span>
-						<!-- Smaller than the stock switch, to match the line it sits on. -->
-						<Switch
-							class="h-4! w-7!"
-							thumbClass="size-3! data-[state=checked]:translate-x-3!"
-							checked={getUserSettings().followMeMoveAlerts}
-							onCheckedChange={(checked) => {
-								getUserSettings().followMeMoveAlerts = checked;
-								updateUserSettings();
-							}}
-						/>
-					</label>
-				{/if}
-			</div>
+			<ToolLink
+				Icon={LocateFixed}
+				title={m.tool_follow_me_title()}
+				description={getFollowMeSummary()}
+				onclick={toggleFollowMe}
+			></ToolLink>
 		{/if}
 	{/if}
 

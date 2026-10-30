@@ -1056,12 +1056,11 @@
 	"followme_info_last_scan": "Last scan",
 	"followme_info_next_scan": "Next scan",
 	"followme_info_minutes": "{count} min",
-	"followme_info_just_now": "just now",
+	"followme_info_seconds": "{count}s",
 	"followme_info_due": "due now",
 	"followme_info_none": "none yet",
 	"followme_info_on_move": "when you move",
 	"followme_info_stop": "Stop following",
-	"followme_alerts_toggle": "Sync Discord Alerts",
 	"followme_info_scans_used": "Scans used",
 	"followme_info_of": "{used} of {limit}"
 }
