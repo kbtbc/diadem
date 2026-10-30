@@ -109,13 +109,14 @@ describe("PokemonQuery personal shinies", () => {
 			context(everywhere)
 		);
 
+		expect(golbat.http).not.toHaveBeenCalled();
 		const body: PokemonScanBody = golbat.grpcOrHttp.mock.calls[0][1];
 		expect(body.annotate_for).toBeUndefined();
 		expect(result.data[0].shiny_for).toBeUndefined();
 	});
 
-	it("annotates and adds shiny_for only to personal filtersets", async () => {
-		golbat.grpcOrHttp.mockResolvedValue(scanResponse([]));
+	it("annotates over HTTP and adds shiny_for only to personal filtersets", async () => {
+		golbat.http.mockResolvedValue(scanResponse([]));
 
 		await new PokemonQuery().query(
 			bounds,
@@ -126,7 +127,8 @@ describe("PokemonQuery personal shinies", () => {
 			context(everywhere, { p1: "Ash", p2: "Misty" })
 		);
 
-		const body: PokemonScanBody = golbat.grpcOrHttp.mock.calls[0][1];
+		expect(golbat.grpcOrHttp).not.toHaveBeenCalled();
+		const body: PokemonScanBody = golbat.http.mock.calls[0][0];
 		expect(body.annotate_for).toEqual(["p1", "p2"]);
 		expect(body.filters[0].shiny_for).toEqual(["p1", "p2"]);
 		expect(body.filters[1].shiny_for).toBeUndefined();
@@ -142,12 +144,13 @@ describe("PokemonQuery personal shinies", () => {
 			context(everywhere)
 		);
 
+		expect(golbat.http).not.toHaveBeenCalled();
 		expect(golbat.grpcOrHttp).not.toHaveBeenCalled();
 		expect(result).toEqual({ data: [], examined: 0 });
 	});
 
 	it("maps player ids to trainer names and marks the pokemon shiny", async () => {
-		golbat.grpcOrHttp.mockResolvedValue(
+		golbat.http.mockResolvedValue(
 			scanResponse([
 				mon("1", 0.25, { shiny_for: ["p2"], background_for: ["p1", "p2"] }),
 				mon("2", 0.25)
@@ -172,7 +175,7 @@ describe("PokemonQuery personal shinies", () => {
 	});
 
 	it("strips personal results outside the permitted area", async () => {
-		golbat.grpcOrHttp.mockResolvedValue(
+		golbat.http.mockResolvedValue(
 			scanResponse([
 				mon("west", 0.25, { shiny_for: ["p1"] }),
 				mon("east", 0.75, { shiny_for: ["p1"] })
@@ -193,7 +196,7 @@ describe("PokemonQuery personal shinies", () => {
 	});
 
 	it("limits a filterset to the trainers it names", async () => {
-		golbat.grpcOrHttp.mockResolvedValue(scanResponse([]));
+		golbat.http.mockResolvedValue(scanResponse([]));
 
 		await new PokemonQuery().query(
 			bounds,
@@ -204,14 +207,14 @@ describe("PokemonQuery personal shinies", () => {
 			context(everywhere, { p1: "Ash", p2: "Misty" })
 		);
 
-		const body: PokemonScanBody = golbat.grpcOrHttp.mock.calls[0][1];
+		const body: PokemonScanBody = golbat.http.mock.calls[0][0];
 		expect(body.annotate_for).toEqual(["p1", "p2"]);
 		expect(body.filters[0].shiny_for).toEqual(["p2"]);
 		expect(body.filters[1].shiny_for).toEqual(["p1", "p2"]);
 	});
 
 	it("drops a filterset whose trainer is no longer linked instead of matching everyone", async () => {
-		golbat.grpcOrHttp.mockResolvedValue(scanResponse([]));
+		golbat.http.mockResolvedValue(scanResponse([]));
 
 		const result = await new PokemonQuery().query(
 			bounds,
@@ -222,12 +225,12 @@ describe("PokemonQuery personal shinies", () => {
 			context(everywhere, { p1: "Ash" })
 		);
 
-		expect(golbat.grpcOrHttp).not.toHaveBeenCalled();
+		expect(golbat.http).not.toHaveBeenCalled();
 		expect(result).toEqual({ data: [], examined: 0 });
 	});
 
 	it("returns linked trainer ids and keeps only mons shiny for the chosen trainer", async () => {
-		golbat.grpcOrHttp.mockResolvedValue(
+		golbat.http.mockResolvedValue(
 			scanResponse([
 				mon("both", 0.25, { shiny_for: ["p1", "p2"] }),
 				mon("misty", 0.25, { shiny_for: ["p2"] }),
@@ -250,7 +253,7 @@ describe("PokemonQuery personal shinies", () => {
 	});
 
 	it("checks every trainer a filterset names", async () => {
-		golbat.grpcOrHttp.mockResolvedValue(
+		golbat.http.mockResolvedValue(
 			scanResponse([
 				mon("a", 0.25, { shiny_for: ["p1"] }),
 				mon("b", 0.25, { shiny_for: ["p2"] }),
@@ -267,7 +270,7 @@ describe("PokemonQuery personal shinies", () => {
 			context(everywhere, { p1: "A", p2: "B", p3: "C" })
 		);
 
-		const body: PokemonScanBody = golbat.grpcOrHttp.mock.calls[0][1];
+		const body: PokemonScanBody = golbat.http.mock.calls[0][0];
 		expect(body.filters[0].shiny_for).toEqual(["p2", "p3"]);
 		expect(result.data.map((p) => p.id)).toEqual(["b", "c"]);
 	});

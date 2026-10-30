@@ -22,7 +22,7 @@ import {
 export const protobufPackage = "golbat_api";
 
 /**
- * Copied verbatim from UnownHash/Golbat grpc/api.proto at commit a1938c6 (PR #423, branch personal-shiny-filter).
+ * Copied verbatim from UnownHash/Golbat grpc/api.proto at commit b24956a (branch feat/grpc-api).
  * Do not edit. Re-copy when Golbat changes it, then run `pnpm run grpc:generate` and commit both.
  */
 
@@ -61,16 +61,7 @@ export interface PokemonDnfFilter {
   size?: IntRange | undefined;
   pvp_little?: IntRange | undefined;
   pvp_great?: IntRange | undefined;
-  pvp_ultra?:
-    | IntRange
-    | undefined;
-  /**
-   * Personal conditions, as in JSON: match if shiny (or has a background)
-   * for any of these player IDs; ANDed with the rest of the clause. Empty
-   * means no constraint. Needs [shiny_rates]; see docs/personal-shinies.md.
-   */
-  shiny_for?: string[] | undefined;
-  background_for?: string[] | undefined;
+  pvp_ultra?: IntRange | undefined;
 }
 
 export interface PokemonScanRequest {
@@ -86,24 +77,7 @@ export interface PokemonScanRequest {
    * OR'd clauses. As in the JSON API an EMPTY list matches nothing; send one
    * clause with no conditions ({}) to match every pokemon.
    */
-  filters?:
-    | PokemonDnfFilter[]
-    | undefined;
-  /**
-   * Only pokemon with updated > updated_after (unix seconds); unset = all.
-   * Applied at response build, after the scan and limit: counters and
-   * limit_reached describe the scan, so a page may come back short. Entities
-   * that expire or stop matching disappear silently; pass max(updated)-1
-   * from the previous response and expect the boundary second again.
-   */
-  updated_after?:
-    | number
-    | undefined;
-  /**
-   * Player IDs to check every returned pokemon against; results list the
-   * matching ones in Pokemon.shiny_for / background_for. Does not filter.
-   */
-  annotate_for?: string[] | undefined;
+  filters?: PokemonDnfFilter[] | undefined;
 }
 
 export interface PokemonScanResponse {
@@ -180,15 +154,7 @@ export interface Pokemon {
   capture_2?: number | undefined;
   capture_3?: number | undefined;
   pvp?: PvpRankings | undefined;
-  is_event?:
-    | number
-    | undefined;
-  /**
-   * Player IDs from PokemonScanRequest.annotate_for this pokemon is shiny
-   * for / has a background for. Empty unless annotate_for was sent.
-   */
-  shiny_for?: string[] | undefined;
-  background_for?: string[] | undefined;
+  is_event?: number | undefined;
 }
 
 export interface ContestFocus {
@@ -260,11 +226,7 @@ export interface FortScanRequest {
     | FortDnfFilter[]
     | undefined;
   /** pokestop scans only */
-  with_incidents?:
-    | boolean
-    | undefined;
-  /** see PokemonScanRequest.updated_after */
-  updated_after?: number | undefined;
+  with_incidents?: boolean | undefined;
 }
 
 export interface FortTypeScanGroup {
@@ -295,11 +257,7 @@ export interface FortCombinedScanRequest {
   /** unset = exclude gyms (unless all three unset) */
   gyms?: FortTypeScanGroup | undefined;
   pokestops?: FortTypeScanGroup | undefined;
-  stations?:
-    | FortTypeScanGroup
-    | undefined;
-  /** applies to every group; see PokemonScanRequest.updated_after */
-  updated_after?: number | undefined;
+  stations?: FortTypeScanGroup | undefined;
 }
 
 /** Mirrors decoder.ApiPokestopIncident. */
@@ -791,8 +749,6 @@ function createBasePokemonDnfFilter(): PokemonDnfFilter {
     pvp_little: undefined,
     pvp_great: undefined,
     pvp_ultra: undefined,
-    shiny_for: [],
-    background_for: [],
   };
 }
 
@@ -839,16 +795,6 @@ export const PokemonDnfFilter: MessageFns<PokemonDnfFilter> = {
     }
     if (message.pvp_ultra !== undefined) {
       IntRange.encode(message.pvp_ultra, writer.uint32(98).fork()).join();
-    }
-    if (message.shiny_for !== undefined && message.shiny_for.length !== 0) {
-      for (const v of message.shiny_for) {
-        writer.uint32(106).string(v!);
-      }
-    }
-    if (message.background_for !== undefined && message.background_for.length !== 0) {
-      for (const v of message.background_for) {
-        writer.uint32(114).string(v!);
-      }
     }
     return writer;
   },
@@ -975,28 +921,6 @@ export const PokemonDnfFilter: MessageFns<PokemonDnfFilter> = {
             message.pvp_ultra = IntRange.decode(reader, reader.uint32());
             continue;
           }
-          case 13: {
-            if (tag !== 106) {
-              break;
-            }
-
-            const el = reader.string();
-            if (el !== undefined) {
-              message.shiny_for!.push(el);
-            }
-            continue;
-          }
-          case 14: {
-            if (tag !== 114) {
-              break;
-            }
-
-            const el = reader.string();
-            if (el !== undefined) {
-              message.background_for!.push(el);
-            }
-            continue;
-          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1047,16 +971,6 @@ export const PokemonDnfFilter: MessageFns<PokemonDnfFilter> = {
         : isSet(object.pvp_ultra)
         ? IntRange.fromJSON(object.pvp_ultra)
         : undefined,
-      shiny_for: globalThis.Array.isArray(object?.shinyFor)
-        ? object.shinyFor.map((e: any) => globalThis.String(e))
-        : globalThis.Array.isArray(object?.shiny_for)
-        ? object.shiny_for.map((e: any) => globalThis.String(e))
-        : [],
-      background_for: globalThis.Array.isArray(object?.backgroundFor)
-        ? object.backgroundFor.map((e: any) => globalThis.String(e))
-        : globalThis.Array.isArray(object?.background_for)
-        ? object.background_for.map((e: any) => globalThis.String(e))
-        : [],
     };
   },
 
@@ -1098,12 +1012,6 @@ export const PokemonDnfFilter: MessageFns<PokemonDnfFilter> = {
     if (message.pvp_ultra !== undefined) {
       obj.pvpUltra = IntRange.toJSON(message.pvp_ultra);
     }
-    if (message.shiny_for?.length) {
-      obj.shinyFor = message.shiny_for;
-    }
-    if (message.background_for?.length) {
-      obj.backgroundFor = message.background_for;
-    }
     return obj;
   },
 
@@ -1138,14 +1046,12 @@ export const PokemonDnfFilter: MessageFns<PokemonDnfFilter> = {
     message.pvp_ultra = (object.pvp_ultra !== undefined && object.pvp_ultra !== null)
       ? IntRange.fromPartial(object.pvp_ultra)
       : undefined;
-    message.shiny_for = object.shiny_for?.map((e) => e) || [];
-    message.background_for = object.background_for?.map((e) => e) || [];
     return message;
   },
 };
 
 function createBasePokemonScanRequest(): PokemonScanRequest {
-  return { min: undefined, max: undefined, limit: 0, filters: [], updated_after: undefined, annotate_for: [] };
+  return { min: undefined, max: undefined, limit: 0, filters: [] };
 }
 
 export const PokemonScanRequest: MessageFns<PokemonScanRequest> = {
@@ -1162,14 +1068,6 @@ export const PokemonScanRequest: MessageFns<PokemonScanRequest> = {
     if (message.filters !== undefined && message.filters.length !== 0) {
       for (const v of message.filters) {
         PokemonDnfFilter.encode(v!, writer.uint32(34).fork()).join();
-      }
-    }
-    if (message.updated_after !== undefined) {
-      writer.uint32(40).int64(message.updated_after);
-    }
-    if (message.annotate_for !== undefined && message.annotate_for.length !== 0) {
-      for (const v of message.annotate_for) {
-        writer.uint32(50).string(v!);
       }
     }
     return writer;
@@ -1223,25 +1121,6 @@ export const PokemonScanRequest: MessageFns<PokemonScanRequest> = {
             }
             continue;
           }
-          case 5: {
-            if (tag !== 40) {
-              break;
-            }
-
-            message.updated_after = longToNumber(reader.int64());
-            continue;
-          }
-          case 6: {
-            if (tag !== 50) {
-              break;
-            }
-
-            const el = reader.string();
-            if (el !== undefined) {
-              message.annotate_for!.push(el);
-            }
-            continue;
-          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1262,16 +1141,6 @@ export const PokemonScanRequest: MessageFns<PokemonScanRequest> = {
       filters: globalThis.Array.isArray(object?.filters)
         ? object.filters.map((e: any) => PokemonDnfFilter.fromJSON(e))
         : [],
-      updated_after: isSet(object.updatedAfter)
-        ? globalThis.Number(object.updatedAfter)
-        : isSet(object.updated_after)
-        ? globalThis.Number(object.updated_after)
-        : undefined,
-      annotate_for: globalThis.Array.isArray(object?.annotateFor)
-        ? object.annotateFor.map((e: any) => globalThis.String(e))
-        : globalThis.Array.isArray(object?.annotate_for)
-        ? object.annotate_for.map((e: any) => globalThis.String(e))
-        : [],
     };
   },
 
@@ -1289,12 +1158,6 @@ export const PokemonScanRequest: MessageFns<PokemonScanRequest> = {
     if (message.filters?.length) {
       obj.filters = message.filters.map((e) => PokemonDnfFilter.toJSON(e));
     }
-    if (message.updated_after !== undefined) {
-      obj.updatedAfter = Math.round(message.updated_after);
-    }
-    if (message.annotate_for?.length) {
-      obj.annotateFor = message.annotate_for;
-    }
     return obj;
   },
 
@@ -1307,8 +1170,6 @@ export const PokemonScanRequest: MessageFns<PokemonScanRequest> = {
     message.max = (object.max !== undefined && object.max !== null) ? LatLon.fromPartial(object.max) : undefined;
     message.limit = object.limit ?? 0;
     message.filters = object.filters?.map((e) => PokemonDnfFilter.fromPartial(e)) || [];
-    message.updated_after = object.updated_after ?? undefined;
-    message.annotate_for = object.annotate_for?.map((e) => e) || [];
     return message;
   },
 };
@@ -1994,8 +1855,6 @@ function createBasePokemon(): Pokemon {
     capture_3: undefined,
     pvp: undefined,
     is_event: 0,
-    shiny_for: [],
-    background_for: [],
   };
 }
 
@@ -2114,16 +1973,6 @@ export const Pokemon: MessageFns<Pokemon> = {
     }
     if (message.is_event !== undefined && message.is_event !== 0) {
       writer.uint32(304).int32(message.is_event);
-    }
-    if (message.shiny_for !== undefined && message.shiny_for.length !== 0) {
-      for (const v of message.shiny_for) {
-        writer.uint32(314).string(v!);
-      }
-    }
-    if (message.background_for !== undefined && message.background_for.length !== 0) {
-      for (const v of message.background_for) {
-        writer.uint32(322).string(v!);
-      }
     }
     return writer;
   },
@@ -2445,28 +2294,6 @@ export const Pokemon: MessageFns<Pokemon> = {
             message.is_event = reader.int32();
             continue;
           }
-          case 39: {
-            if (tag !== 314) {
-              break;
-            }
-
-            const el = reader.string();
-            if (el !== undefined) {
-              message.shiny_for!.push(el);
-            }
-            continue;
-          }
-          case 40: {
-            if (tag !== 322) {
-              break;
-            }
-
-            const el = reader.string();
-            if (el !== undefined) {
-              message.background_for!.push(el);
-            }
-            continue;
-          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -2599,16 +2426,6 @@ export const Pokemon: MessageFns<Pokemon> = {
         : isSet(object.is_event)
         ? globalThis.Number(object.is_event)
         : 0,
-      shiny_for: globalThis.Array.isArray(object?.shinyFor)
-        ? object.shinyFor.map((e: any) => globalThis.String(e))
-        : globalThis.Array.isArray(object?.shiny_for)
-        ? object.shiny_for.map((e: any) => globalThis.String(e))
-        : [],
-      background_for: globalThis.Array.isArray(object?.backgroundFor)
-        ? object.backgroundFor.map((e: any) => globalThis.String(e))
-        : globalThis.Array.isArray(object?.background_for)
-        ? object.background_for.map((e: any) => globalThis.String(e))
-        : [],
     };
   },
 
@@ -2728,12 +2545,6 @@ export const Pokemon: MessageFns<Pokemon> = {
     if (message.is_event !== undefined && message.is_event !== 0) {
       obj.isEvent = Math.round(message.is_event);
     }
-    if (message.shiny_for?.length) {
-      obj.shinyFor = message.shiny_for;
-    }
-    if (message.background_for?.length) {
-      obj.backgroundFor = message.background_for;
-    }
     return obj;
   },
 
@@ -2780,8 +2591,6 @@ export const Pokemon: MessageFns<Pokemon> = {
     message.capture_3 = object.capture_3 ?? undefined;
     message.pvp = (object.pvp !== undefined && object.pvp !== null) ? PvpRankings.fromPartial(object.pvp) : undefined;
     message.is_event = object.is_event ?? 0;
-    message.shiny_for = object.shiny_for?.map((e) => e) || [];
-    message.background_for = object.background_for?.map((e) => e) || [];
     return message;
   },
 };
@@ -3575,7 +3384,7 @@ export const FortDnfFilter: MessageFns<FortDnfFilter> = {
 };
 
 function createBaseFortScanRequest(): FortScanRequest {
-  return { min: undefined, max: undefined, limit: 0, filters: [], with_incidents: false, updated_after: undefined };
+  return { min: undefined, max: undefined, limit: 0, filters: [], with_incidents: false };
 }
 
 export const FortScanRequest: MessageFns<FortScanRequest> = {
@@ -3596,9 +3405,6 @@ export const FortScanRequest: MessageFns<FortScanRequest> = {
     }
     if (message.with_incidents !== undefined && message.with_incidents !== false) {
       writer.uint32(40).bool(message.with_incidents);
-    }
-    if (message.updated_after !== undefined) {
-      writer.uint32(48).int64(message.updated_after);
     }
     return writer;
   },
@@ -3659,14 +3465,6 @@ export const FortScanRequest: MessageFns<FortScanRequest> = {
             message.with_incidents = reader.bool();
             continue;
           }
-          case 6: {
-            if (tag !== 48) {
-              break;
-            }
-
-            message.updated_after = longToNumber(reader.int64());
-            continue;
-          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -3692,11 +3490,6 @@ export const FortScanRequest: MessageFns<FortScanRequest> = {
         : isSet(object.with_incidents)
         ? globalThis.Boolean(object.with_incidents)
         : false,
-      updated_after: isSet(object.updatedAfter)
-        ? globalThis.Number(object.updatedAfter)
-        : isSet(object.updated_after)
-        ? globalThis.Number(object.updated_after)
-        : undefined,
     };
   },
 
@@ -3717,9 +3510,6 @@ export const FortScanRequest: MessageFns<FortScanRequest> = {
     if (message.with_incidents !== undefined && message.with_incidents !== false) {
       obj.withIncidents = message.with_incidents;
     }
-    if (message.updated_after !== undefined) {
-      obj.updatedAfter = Math.round(message.updated_after);
-    }
     return obj;
   },
 
@@ -3733,7 +3523,6 @@ export const FortScanRequest: MessageFns<FortScanRequest> = {
     message.limit = object.limit ?? 0;
     message.filters = object.filters?.map((e) => FortDnfFilter.fromPartial(e)) || [];
     message.with_incidents = object.with_incidents ?? false;
-    message.updated_after = object.updated_after ?? undefined;
     return message;
   },
 };
@@ -3928,7 +3717,6 @@ function createBaseFortCombinedScanRequest(): FortCombinedScanRequest {
     gyms: undefined,
     pokestops: undefined,
     stations: undefined,
-    updated_after: undefined,
   };
 }
 
@@ -3954,9 +3742,6 @@ export const FortCombinedScanRequest: MessageFns<FortCombinedScanRequest> = {
     }
     if (message.stations !== undefined) {
       FortTypeScanGroup.encode(message.stations, writer.uint32(58).fork()).join();
-    }
-    if (message.updated_after !== undefined) {
-      writer.uint32(64).int64(message.updated_after);
     }
     return writer;
   },
@@ -4030,14 +3815,6 @@ export const FortCombinedScanRequest: MessageFns<FortCombinedScanRequest> = {
             message.stations = FortTypeScanGroup.decode(reader, reader.uint32());
             continue;
           }
-          case 8: {
-            if (tag !== 64) {
-              break;
-            }
-
-            message.updated_after = longToNumber(reader.int64());
-            continue;
-          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -4063,11 +3840,6 @@ export const FortCombinedScanRequest: MessageFns<FortCombinedScanRequest> = {
       gyms: isSet(object.gyms) ? FortTypeScanGroup.fromJSON(object.gyms) : undefined,
       pokestops: isSet(object.pokestops) ? FortTypeScanGroup.fromJSON(object.pokestops) : undefined,
       stations: isSet(object.stations) ? FortTypeScanGroup.fromJSON(object.stations) : undefined,
-      updated_after: isSet(object.updatedAfter)
-        ? globalThis.Number(object.updatedAfter)
-        : isSet(object.updated_after)
-        ? globalThis.Number(object.updated_after)
-        : undefined,
     };
   },
 
@@ -4094,9 +3866,6 @@ export const FortCombinedScanRequest: MessageFns<FortCombinedScanRequest> = {
     if (message.stations !== undefined) {
       obj.stations = FortTypeScanGroup.toJSON(message.stations);
     }
-    if (message.updated_after !== undefined) {
-      obj.updatedAfter = Math.round(message.updated_after);
-    }
     return obj;
   },
 
@@ -4118,7 +3887,6 @@ export const FortCombinedScanRequest: MessageFns<FortCombinedScanRequest> = {
     message.stations = (object.stations !== undefined && object.stations !== null)
       ? FortTypeScanGroup.fromPartial(object.stations)
       : undefined;
-    message.updated_after = object.updated_after ?? undefined;
     return message;
   },
 };
@@ -8182,9 +7950,7 @@ export const FortScanResponse: MessageFns<FortScanResponse> = {
 /**
  * GolbatApi is the gRPC counterpart of the HTTP /api scan endpoints. Every
  * message mirrors the JSON request/response struct it is named after, field
- * for field; decoder/api_grpc_parity_test.go enforces that. Semantics,
- * auth and the differences from the JSON API are documented in api.md
- * under "gRPC API".
+ * for field (see docs/superpowers/specs/2026-09-09-grpc-api-design.md).
  */
 export type GolbatApiService = typeof GolbatApiService;
 export const GolbatApiService = {
