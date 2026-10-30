@@ -6,8 +6,6 @@ import { startFortApiDetection } from "@/lib/server/api/golbat/fortAvailability"
 import { restoreStrandedAlertFollows } from "@/lib/server/features/followMeAlerts";
 import { getLogger } from "@/lib/utils/logger";
 import "@/lib/server/encounterIds";
-import { isPlayerIdEnabled } from "@/lib/server/api/playerIdApi";
-import { ensureLinkedTrainerTable } from "@/lib/server/db/internal/ensureTables";
 
 export async function initDiadem() {
 	const log = getLogger("init");
@@ -18,8 +16,7 @@ export async function initDiadem() {
 		uiconsIndexProvider.refresh(),
 		remoteLocaleProvider.refresh(),
 		masterstatsProvider.refresh(),
-		startFortApiDetection(),
-		isPlayerIdEnabled() ? ensureLinkedTrainerTable() : undefined
+		startFortApiDetection()
 	]);
 	// Anyone a restart left on a follow profile, put back before they notice
 	// their alerts measuring from the wrong place. Never blocks startup.
