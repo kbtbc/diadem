@@ -6,7 +6,6 @@ enum ExtraFeature {
 
 	POKEMON_IV = "pokemon_iv",
 	POKEMON_PVP = "pokemon_pvp",
-	POKEMON_PERSONAL_SHINY = "pokemon_personal_shiny",
 	POKEMON_ALL = "pokemon*",
 
 	QUEST = "quest",
@@ -67,7 +66,6 @@ export const featureFamily: Record<MapObjectType, FeaturesKey[]> = {
 };
 
 export const featureWildcardChildren: Partial<Record<FeaturesKey, FeaturesKey[]>> = {
-	// pokemon_personal_shiny is deliberately left out: it's granted explicitly (or by "*")
 	[Features.POKEMON_ALL]: [Features.POKEMON, Features.POKEMON_IV, Features.POKEMON_PVP],
 	[Features.POKESTOP_ALL]: [
 		Features.POKESTOP,

@@ -24,40 +24,6 @@ import { getNormalizedForm, League, showPvp } from "@/lib/utils/pokemonUtils";
 import { error } from "@sveltejs/kit";
 import { bboxPolygon, booleanPointInPolygon } from "@turf/turf";
 
-function trainerNames(trainers: Map<string, string>, playerIds: string[] | undefined) {
-	const names = playerIds?.flatMap((id) => {
-		const name = trainers.get(id);
-		return name ? [name] : [];
-	});
-	return names?.length ? names : undefined;
-}
-
-function linkIdsFor(links: Map<string, string> | undefined, playerIds: string[] | undefined) {
-	if (!links || !playerIds?.length) return undefined;
-	const ids = [...links].flatMap(([linkId, playerId]) =>
-		playerIds.includes(playerId) ? [linkId] : []
-	);
-	return ids.length ? ids : undefined;
-}
-
-/**
- * Players a personal filterset checks shinies for: the trainers it names (that the user
- * still has linked), or all linked trainers when it names none. Empty = can't match.
- */
-function playersForFilterset(
-	filterset: { personalShinyTrainers?: string[] },
-	context: FeaturePermissionContext | undefined
-): string[] {
-	const all = [...(context?.personalTrainers?.keys() ?? [])];
-	const selected = filterset.personalShinyTrainers;
-	if (!selected?.length) return all;
-	const links = context?.personalTrainerLinks;
-	return selected.flatMap((linkId) => {
-		const playerId = links?.get(linkId);
-		return playerId && all.includes(playerId) ? [playerId] : [];
-	});
-}
-
 export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 	protected readonly type = MapObjectType.POKEMON;
 	protected readonly limit = requestLimits[MapObjectType.POKEMON];
@@ -72,8 +38,6 @@ export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 	): Promise<MapObjectResponse<MinMapObject<PokemonData>>> {
 		if (filter && !filter.enabled) return { data: [], examined: 0 };
 		const golbatQueries = this.buildGolbatQueries(filter, bounds, polygon, context);
-		// Every filterset was personal and the user has no linked trainers to match them
-		if (golbatQueries.length === 0) return { data: [], examined: 0 };
 
 		const actualLimit = Math.min(limit ?? this.limit, this.limit);
 		const body: PokemonScanBody = {
@@ -83,9 +47,6 @@ export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 			limit: 0,
 			filters: golbatQueries
 		};
-
-		const personalPlayers = [...(context?.personalTrainers?.keys() ?? [])];
-		if (personalPlayers.length > 0) body.annotate_for = personalPlayers;
 
 		const result = await scanViaGrpcOrHttp("pokemon", body, grpcScanPokemon, getMultiplePokemon);
 		if (!result) error(500);
@@ -149,14 +110,6 @@ export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 		const ivAllowed = !context || context.isAllowedAt(Features.POKEMON_IV, p.lat, p.lon);
 		const pvpAllowed = !context || context.isAllowedAt(Features.POKEMON_PVP, p.lat, p.lon);
 		const statsAllowed = ivAllowed || pvpAllowed;
-		const trainers = context?.personalTrainers;
-		const personalAllowed =
-			trainers && context.isAllowedAt(Features.POKEMON_PERSONAL_SHINY, p.lat, p.lon);
-		const shinyFor = personalAllowed ? trainerNames(trainers, p.shiny_for) : undefined;
-		const shinyForLinks = shinyFor
-			? linkIdsFor(context?.personalTrainerLinks, p.shiny_for)
-			: undefined;
-		const backgroundFor = personalAllowed ? trainerNames(trainers, p.background_for) : undefined;
 
 		const pokemon = {
 			id: encodeEncounterId(p.id),
@@ -187,11 +140,7 @@ export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 			changed: p.changed,
 			display_pokemon_id: p.display_pokemon_id,
 			display_pokemon_form: getNormalizedForm(p.display_pokemon_id, p.display_pokemon_form),
-			seen_type: p.seen_type,
-			shiny: shinyFor ? true : undefined,
-			shiny_for: shinyFor,
-			shiny_for_links: shinyForLinks,
-			background_for: backgroundFor
+			seen_type: p.seen_type
 		} as PokemonData;
 
 		if (pvpAllowed) {
@@ -241,16 +190,10 @@ export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 		polygon: PermittedPolygon,
 		context?: FeaturePermissionContext
 	): GolbatPokemonQuery[] {
-		const allEnabledFilters = filter?.filters?.filter((f) => f.enabled) ?? [];
-		if (allEnabledFilters.length === 0) {
+		const enabledFilters = filter?.filters?.filter((f) => f.enabled) ?? [];
+		if (enabledFilters.length === 0) {
 			return [{ pokemon: [] }];
 		}
-
-		// A personal filterset can't match anything without (any of its) linked trainers.
-		// Never send an empty shiny_for: Golbat would treat it as no constraint at all.
-		const enabledFilters = allEnabledFilters.filter(
-			(f) => !f.personalShiny || playersForFilterset(f, context).length > 0
-		);
 
 		// Numeric iv/pvp constraints would leak whether unseen mons match. Only push them to
 		// Golbat when the tier is granted throughout the queried area; otherwise drop them and
@@ -274,7 +217,6 @@ export class PokemonQuery extends MapObjectQuery<PokemonData, FilterPokemon> {
 
 		return enabledFilters.map((filter) => {
 			const query: GolbatPokemonQuery = {};
-			if (filter.personalShiny) query.shiny_for = playersForFilterset(filter, context);
 			if (filter.pokemon) {
 				query.pokemon = [];
 

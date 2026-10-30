@@ -17,18 +17,6 @@ import { getId } from "@/lib/utils/uuid";
 export const premadeFiltersets: { [key in FilterCategory]?: AnyFilterset[] } = {
 	pokemon: [
 		filterset<FiltersetPokemon>({
-			emoji: "🌟",
-			title: "filter_template_shundo",
-			personalShiny: true,
-			personalShinyTrainers: [],
-			iv: { min: 100, max: 100 },
-			modifiers: {
-				glow: {
-					color: MODIFIER_COLORS.purple
-				}
-			}
-		}),
-		filterset<FiltersetPokemon>({
 			emoji: "💯",
 			title: "filter_template_hundo",
 			iv: { min: 100, max: 100 },
@@ -70,16 +58,6 @@ export const premadeFiltersets: { [key in FilterCategory]?: AnyFilterset[] } = {
 					color: MODIFIER_COLORS.yellow
 				},
 				showBadge: true
-			}
-		}),
-		filterset<FiltersetPokemon>({
-			emoji: "✨",
-			title: "filter_template_personal_shiny",
-			personalShiny: true,
-			modifiers: {
-				glow: {
-					color: MODIFIER_COLORS.purple
-				}
 			}
 		}),
 		filterset<FiltersetPokemon>({

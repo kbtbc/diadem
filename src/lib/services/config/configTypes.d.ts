@@ -196,13 +196,6 @@ export type ServerConfig = {
 		basicAuth?: string;
 		hasGeometries?: boolean;
 	};
-	playerId?: {
-		/** PlayerID service, e.g. https://playerid.mew.is */
-		url: string;
-		apiKey: string;
-		/** Linked trainers per user. Default 10. */
-		maxTrainers?: number;
-	};
 	poracle?: {
 		/** PoracleNG API, e.g. http://127.0.0.1:3030 */
 		url: string;

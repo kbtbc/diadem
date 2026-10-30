@@ -27,7 +27,6 @@ export const GET: RequestHandler = async ({ locals, request }) => {
 		showFullscreenLogin: authRequired && !locals.user,
 		geometryLookup:
 			Boolean(config.nominatim?.url) &&
-			(!Boolean(config.pelias?.url) || Boolean(config.photon?.url)),
-		personalShiny: Boolean(config.playerId?.url && config.playerId?.apiKey)
+			(!Boolean(config.pelias?.url) || Boolean(config.photon?.url))
 	} as SupportedFeatures);
 };
