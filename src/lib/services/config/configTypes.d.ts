@@ -207,8 +207,6 @@ export type ServerConfig = {
 		/** PoracleNG API, e.g. http://127.0.0.1:3030 */
 		url: string;
 		secret?: string;
-		/** Copy linked trainers to the user's Poracle accounts. Default false. */
-		syncLinkedTrainers?: boolean;
 		/**
 		 * Move a user's alert location with them while follow-me runs, by
 		 * borrowing a "follow" profile. Default false.
