@@ -20,10 +20,61 @@ defaultNestName = "Unknown Nest"
 #[server.talonflame]
 #url = "http://127.0.0.1:9042"
 
-# Dragonite integration for scout
+# Dragonite integration for scout and follow-me
 [server.dragonite]
 url = "http://127.0.0.1:7272"
 secret = ""
+
+# What a scan asks Dragonite for, and how much of it one user may ask for.
+# Shared by the scout tool and follow-me: the daily allowance is one budget
+# across both, so a user cannot spend it twice.
+[server.scout]
+# Scout locations one user may queue per day. Default 8000, which is about
+# 163 follow-me scans.
+locationsPerDay = 8000
+# Most locations a single request may ask for. Default 64.
+maxLocationsPerRequest = 64
+# Routes are static, so asking on every scan pays repeatedly for the same
+# answer. Default false.
+routes = false
+# Default true for both.
+showcases = true
+forts = true
+
+# Follow-me: a rolling scan around the user while they move. Needs the
+# follow_me feature granted in [[server.permissions]] and followMe = true in
+# [client.tools].
+[server.followMe]
+# Scans one user may queue per hour. Default 24.
+scansPerHour = 24
+# Concurrent followers across the whole instance. Default 70.
+maxFollowers = 70
+# Stop queueing while Dragonite's scout queue is deeper than this, so
+# follow-me gives way to everything else asking for scouts. Default 50.
+queueLimit = 50
+# "overlap" refuses a scan when any of its 49 points falls inside an area
+# Dragonite already covers; "center" refuses only when the user is standing
+# in one. Default "overlap".
+overlapMode = "overlap"
+# Discord ids allowed to scan inside a covered area anyway. For testing
+# without first driving out of town: coverage is the one refusal that ends a
+# session rather than retrying it. Their scans still cost quota and
+# allowance.
+#coverageExemptDiscordIds = ["208639651445997568"]
+
+# Optional PoracleNG integration. Comment out to disable.
+#[server.poracle]
+#url = "http://127.0.0.1:3030"
+#secret = ""
+# Move a user's alert location along with them while follow-me runs, so the
+# distance each alert prints is measured from where they actually are. It
+# borrows a "follow" profile rather than writing their home location, which
+# stays untouched in their own profile. Default false.
+#followMeAlerts = true
+# How far they must travel before their alerts move, and how often at most.
+# Defaults 1000 and 60.
+#alertMinMeters = 1000
+#alertMinSeconds = 60
 
 # Optional Koji integrtion. Comment out to disable
 [server.koji]
@@ -91,7 +142,7 @@ serverId = "1359028304128245934"
 #     gym* / gym, raid
 #     station* / station, max_battle
 #     minor_map_object* (map objects with no sub-features) / nest, biome, tappable, s2cell, spawnpoint, route
-#   tool* / scout, coverage_map, wayfarer_map
+#   tool* / scout, follow_me, coverage_map, wayfarer_map
 #   ui* / search, weather
 #
 # Below are some examples
@@ -224,6 +275,18 @@ showToolsMenu = true
 
 coverageMap = true
 scout = true
+followMe = true
+
+# Follow-me's client-side limits. The server has its own section.
+[client.followMe]
+# Pause scanning above this ground speed - fast enough that nothing is
+# scanned the user could act on. Default 90.
+maxSpeedKmh = 90
+# And resume below this, so a red light does not end the session. Defaults to
+# two thirds of maxSpeedKmh, so 60.
+resumeSpeedKmh = 60
+# Floor between scans. Default 90, and never less than 15 whatever is set.
+minScanIntervalSeconds = 90
 
 # Map Positions for various maps in the UI
 [client.mapPositions]
