@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getKojiGeofences, type KojiFeature } from "@/lib/features/koji";
+	import { getKojiGeofences, type KojiFeature, type KojiSidebarEntry } from "@/lib/features/koji";
 	import { compareAreaNames, groupByState } from "@/lib/features/coverageGroups";
 	import Button from "@/components/ui/input/Button.svelte";
 	import LucideIcon from "@/components/utils/LucideIcon.svelte";
@@ -11,7 +11,7 @@
 	import { m } from "@/lib/paraglide/messages";
 	import type * as icons from "@lucide/svelte";
 
-	let expandedAreas: Set<number> = new SvelteSet();
+	let expandedAreas: Set<number | string> = new SvelteSet();
 	// State groups start collapsed except Georgia; codes in here are open.
 	let expandedStates: Set<string> = new SvelteSet(["GA"]);
 
@@ -19,19 +19,19 @@
 		if (!expandedStates.delete(code)) expandedStates.add(code);
 	}
 
-	function getAreaIcon(area: KojiFeature): keyof typeof icons {
+	function getAreaIcon(area: KojiSidebarEntry): keyof typeof icons {
 		return (area.properties.lucideIcon ?? "Globe") as keyof typeof icons;
 	}
 </script>
 
-{#snippet areaTitle(area: KojiFeature)}
+{#snippet areaTitle(area: KojiSidebarEntry)}
 	<LucideIcon class="size-4 ml-2" name={getAreaIcon(area)} />
-	<span>{area.properties.name}</span>
+	<span class="min-w-0 truncate" title={area.properties.name}>{area.properties.name}</span>
 {/snippet}
 
 {#snippet jumpButton(area: KojiFeature)}
 	<Button
-		class="ml-auto px-6"
+		class="ml-auto shrink-0 px-6"
 		size="sm"
 		variant="secondary"
 		onclick={() => selectCoverageMapArea(area)}
@@ -40,16 +40,17 @@
 	</Button>
 {/snippet}
 
-{#snippet areaEntry(area: KojiFeature)}
+{#snippet areaEntry(area: KojiSidebarEntry)}
 	{@const isExpanded = expandedAreas.has(area.properties.id)}
 	<div class="w-full flex py-2 items-center pl-2 pr-2 gap-3 text-sm font-medium">
 		{#if area.properties.children.length === 0}
 			{@render areaTitle(area)}
 		{:else}
 			<Button
-				class="gap-3! pl-0!"
+				class="min-w-0 gap-3! pl-0!"
 				size="sm"
 				variant="ghost"
+				aria-expanded={isExpanded}
 				onclick={() => {
 					const existed = expandedAreas.delete(area.properties.id);
 					if (!existed) expandedAreas.add(area.properties.id);
@@ -64,7 +65,9 @@
 			</Button>
 		{/if}
 
-		{@render jumpButton(area)}
+		{#if "geometry" in area}
+			{@render jumpButton(area)}
+		{/if}
 	</div>
 
 	{#if isExpanded}

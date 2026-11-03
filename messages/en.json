@@ -562,7 +562,7 @@
 	"notice_lure": "This {name} comes from a Lure Module",
 	"notice_tappable": "This {name} appears after tapping a gift",
 	"notice_disguise": "This {name1} is disguised as a {name2}",
-	"notice_nearby": "This {name} was seen nearby. Its location is estimated and details are unknown",
+	"notice_nearby": "This {name} was seen nearby. Its location and disappear time are unknown",
 	"notice_wild": "This {name} has not yet been scanned completely. Its details are unknown",
 	"notice_mighty": "This is a Mighty Pokémon! Its stats are much better than usual, but it's extra difficult to catch",
 	"notice_hundo": "Hundo! This {name} has 100% IV",
@@ -716,6 +716,9 @@
 	"address_unavailable": "Address unavailable",
 	"my_location": "My Location",
 	"in_range": "In Range",
+	"nearby_pokestop_notice": "This {species} was seen close to this Pokéstop. Its exact location is unknown",
+	"nearby_cell_notice": "The location of this {species} is unknown. Find it somewhere in this rectangle",
+	"encounter_cp": "Encounter CP",
 	"quick_action_enable": "Enable",
 	"quick_action_disable": "Disable",
 	"quick_action_focus": "Focus",
@@ -1062,5 +1065,9 @@
 	"followme_info_on_move": "when you move",
 	"followme_info_stop": "Stop following",
 	"followme_info_scans_used": "Scans used",
-	"followme_info_of": "{used} of {limit}"
+	"followme_info_of": "{used} of {limit}",
+	"pokemon_picker_show_more": "Show more",
+	"native_auth_return": "Return to Diadem",
+	"native_auth_complete": "Successfully signed in",
+	"native_auth_failed": "Sign-in failed, please try again"
 }

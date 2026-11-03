@@ -4,12 +4,13 @@ import { remoteLocaleProvider } from "@/lib/server/provider/remoteLocaleProvider
 import { uiconsIndexProvider } from "@/lib/server/provider/uiconsIndexProvider";
 import { startFortApiDetection } from "@/lib/server/api/golbat/fortAvailability";
 import { restoreStrandedAlertFollows } from "@/lib/server/features/followMeAlerts";
+import { initCpuWorkers } from "@/lib/server/workers/cpu";
 import { getLogger } from "@/lib/utils/logger";
-import "@/lib/server/encounterIds";
 
 export async function initDiadem() {
 	const log = getLogger("init");
 	log.info("Initializing Diadem");
+	initCpuWorkers();
 
 	await Promise.all([
 		masterfileProvider.refresh(),

@@ -1,6 +1,6 @@
 {
 	"name": "diadem",
-	"version": "0.10.0",
+	"version": "0.11.0",
 	"license": "AGPL-3.0-only",
 	"private": true,
 	"type": "module",
@@ -22,7 +22,7 @@
 		"cap:sync": "cap sync",
 		"cap:sync:android": "cap sync android",
 		"cap:sync:ios": "cap sync ios",
-		"build:native": "BUILD_TARGET=native vite build",
+		"build:native": "BUILD_TARGET=web svelte-kit sync && BUILD_TARGET=native vite build",
 		"build:native:android": "pnpm run build:native && cap sync android",
 		"build:native:ios": "pnpm run build:native && cap sync ios",
 		"native:android:nogms": "bash scripts/native/build-nogms.sh"
@@ -84,6 +84,7 @@
 		"maplibre-gl": "^6.7.0",
 		"mode-watcher": "^1.1.0",
 		"mysql2": "^3.24.3",
+		"piscina": "^5.3.2",
 		"rate-limiter-flexible": "^11.2.0",
 		"runed": "^0.37.1",
 		"s2js": "^1.44.0",
