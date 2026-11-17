@@ -41,6 +41,7 @@
 		showPvp,
 		showUltra
 	} from "$lib/utils/pokemonUtils";
+	import { isDisguised } from "$lib/utils/disguise";
 	import { slide } from "svelte/transition";
 	import { resize } from "$lib/services/assets";
 	import { getWeatherIcon } from "$lib/utils/weatherIcons";
@@ -371,7 +372,7 @@
 		{/if}
 
 		<!--Ditto-->
-		{#if data.display_pokemon_id}
+		{#if isDisguised(data)}
 			{@const displayPokemon = {
 				pokemon_id: data.display_pokemon_id,
 				form: data.display_pokemon_form
